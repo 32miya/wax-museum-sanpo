@@ -1252,6 +1252,7 @@ const miniC=$('miniC'), mg=miniC.getContext('2d');
 function drawMini(){ const lv=lvlOf(P.x,P.y,P.z); const L=LVCAN[lv]||(LVCAN[lv]=drawLevel(lv)); const W=216, scale=lv==='out'?3.2:5; const k=scale/L.sx;
   mg.fillStyle='#0d0b0b'; mg.fillRect(0,0,W,W); mg.save(); mg.translate(W/2,W/2); mg.scale(k,k); mg.translate(-(P.x-L.B.x0)*L.sx,-(P.z-L.B.z0)*L.sx); mg.drawImage(L.c,0,0); mg.restore();
   mg.fillStyle='#e0313b'; for(const s of SPOTS){ if(s.lvl!==lv) continue; const dx=(s.x-P.x)*scale+W/2, dz=(s.z-P.z)*scale+W/2; if(dx<0||dx>W||dz<0||dz>W) continue; mg.save(); mg.translate(dx,dz); mg.rotate(PI/4); mg.fillRect(-4,-4,8,8); mg.restore(); }
+  if(GAMEMINI) GAMEMINI(mg,W,scale,lv);
   mg.save(); mg.translate(W/2,W/2); mg.rotate(-P.yaw); mg.fillStyle='#fff'; mg.beginPath(); mg.moveTo(0,-11); mg.lineTo(7,8); mg.lineTo(0,4); mg.lineTo(-7,8); mg.closePath(); mg.fill(); mg.restore(); }
 
 /* ============================================================
@@ -1345,7 +1346,7 @@ $('shotX').onclick=()=>{ $('shot').hidden=true; };
 /* ============================================================
    メインループ
    ============================================================ */
-let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null;
+let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null, GAMEMINI=null;
 let START=true, last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
 const tmpV=new THREE.Vector3(), fwd=new THREE.Vector3();
 function step(dt,t){

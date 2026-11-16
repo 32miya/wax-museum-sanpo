@@ -172,7 +172,7 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 .plist small{color:var(--mute);font-size:11px;margin-left:auto}.plist em{font-style:normal;font-size:10px;color:var(--shu2)}
 .sets{display:flex;gap:10px}.sets label{flex:1;display:grid;gap:4px;font-size:12px;color:var(--mute)}
 .lmsg{font-size:14px;line-height:1.7}
-#oniHud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 92px);left:16px;z-index:6;pointer-events:none;text-shadow:0 1px 8px #000}
+#oniHud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:calc(env(safe-area-inset-left,0px) + 16px);z-index:6;pointer-events:none;text-shadow:0 1px 8px #000}
 #oniTime{font-family:var(--f-disp);font-weight:800;font-size:28px;letter-spacing:.05em}#oniTime.pre{color:var(--shu2);font-size:18px}
 #oniCount{font-size:12px;color:var(--mute)}
 #oniGoal{font-size:12px;margin-top:4px;max-width:58vw;line-height:1.5}#oniGoal.key{color:#bcd0ff;font-weight:700}
@@ -188,6 +188,8 @@ body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
 #oniDrop{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.8);padding:16px}#oniDrop .box{max-width:380px;display:grid;gap:10px;text-align:center}#oniDrop b{font-family:var(--f-disp);font-size:22px}#oniDrop p{margin:0;font-size:14px;line-height:1.7}
 #oniEnd{position:fixed;inset:0;z-index:36;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.86);padding:16px}
 #oniEnd .box{width:100%;max-width:420px;display:grid;gap:10px}#oniEnd .k{font-size:12px;letter-spacing:.2em;color:var(--mute)}#oniEnd h2{margin:0;font-family:var(--f-disp);font-size:38px;color:var(--shu2)}#oniEnd p{margin:0;line-height:1.8;font-size:14px}
+body.ingame .place,body.ingame #spotsBtn,body.ingame #poi{display:none!important}
+@media (max-height:520px){ .topbtns{top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 132px)} #menu{top:calc(env(safe-area-inset-top,0px) + 54px);right:calc(env(safe-area-inset-right,0px) + 132px)} #oniGoal{max-width:40vw} #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:48vw;font-size:12px} }
 </style>
 </head>
 <body>
@@ -1294,6 +1296,7 @@ const miniC=$('miniC'), mg=miniC.getContext('2d');
 function drawMini(){ const lv=lvlOf(P.x,P.y,P.z); const L=LVCAN[lv]||(LVCAN[lv]=drawLevel(lv)); const W=216, scale=lv==='out'?3.2:5; const k=scale/L.sx;
   mg.fillStyle='#0d0b0b'; mg.fillRect(0,0,W,W); mg.save(); mg.translate(W/2,W/2); mg.scale(k,k); mg.translate(-(P.x-L.B.x0)*L.sx,-(P.z-L.B.z0)*L.sx); mg.drawImage(L.c,0,0); mg.restore();
   mg.fillStyle='#e0313b'; for(const s of SPOTS){ if(s.lvl!==lv) continue; const dx=(s.x-P.x)*scale+W/2, dz=(s.z-P.z)*scale+W/2; if(dx<0||dx>W||dz<0||dz>W) continue; mg.save(); mg.translate(dx,dz); mg.rotate(PI/4); mg.fillRect(-4,-4,8,8); mg.restore(); }
+  if(GAMEMINI) GAMEMINI(mg,W,scale,lv);
   mg.save(); mg.translate(W/2,W/2); mg.rotate(-P.yaw); mg.fillStyle='#fff'; mg.beginPath(); mg.moveTo(0,-11); mg.lineTo(7,8); mg.lineTo(0,4); mg.lineTo(-7,8); mg.closePath(); mg.fill(); mg.restore(); }
 
 /* ============================================================
@@ -1387,7 +1390,7 @@ $('shotX').onclick=()=>{ $('shot').hidden=true; };
 /* ============================================================
    メインループ
    ============================================================ */
-let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null;
+let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null, GAMEMINI=null;
 let START=true, last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
 const tmpV=new THREE.Vector3(), fwd=new THREE.Vector3();
 function step(dt,t){
@@ -1663,7 +1666,7 @@ const net={mode:null,peer:null,conns:new Map(),seen:new Map(),host:null,myId:0,c
 let me={name:'',role:'run',ch:0,tok:''};
 try{ const s=JSON.parse(localStorage.getItem('oni_me')||'{}'); Object.assign(me,s); }catch(e){}
 if(!me.tok){ me.tok=Math.random().toString(36).slice(2)+Date.now().toString(36); try{ localStorage.setItem('oni_me',JSON.stringify(me)); }catch(e){} }
-let lobby=[]; let SET={min:5,ai:'auto'};
+let lobby=[]; let SET={min:10,ai:'auto'};
 let G=null;   // 主だけが持つ正本
 let V=null;   // 画面に出す最新の状態（主は G から作る）
 let myIdx=-1, inGame=false, ended=false;
@@ -1872,7 +1875,7 @@ function showLobby(){ const L=el('oniL'); L.hidden=false; const isHost=net.mode=
   el('oniLbody').innerHTML=`${net.solo?'<h3>ひとりで遊ぶ</h3>':`<h3>部屋番号 <b class="code">${esc(net.code)}</b></h3><button class="o2" id="oniCopy">招待リンクをコピー</button>`}
    ${charPicker()}
    <ul class="plist">${lobby.map(l=>`<li><span class="${l.role==='oni'?'oni':'run'}">${l.role==='oni'?'鬼':'逃'}</span>${esc(l.n)}<small>${esc((l.role==='oni'?CH.DEMONS:CH.RUNNERS)[l.ch%(l.role==='oni'?6:4)].name)}</small>${l.away?'<em>再接続待ち</em>':''}${l.id===net.myId?'<em>あなた</em>':''}</li>`).join('')}</ul>
-   ${isHost?`<div class="sets"><label>時間<select id="oniMin">${[3,5,8,10].map(v=>`<option ${SET.min==v?'selected':''} value="${v}">${v}分</option>`).join('')}</select></label>
+   ${isHost?`<div class="sets"><label>時間<select id="oniMin">${[10,15,20].map(v=>`<option ${SET.min==v?'selected':''} value="${v}">${v}分</option>`).join('')}</select></label>
      <label>AIの鬼<select id="oniAi">${['auto',0,1,2,3].map(v=>`<option ${SET.ai==v?'selected':''} value="${v}">${v==='auto'?'おまかせ':v+'体'}</option>`).join('')}</select></label></div>
      <button class="o1" id="oniGo">はじめる</button>`:'<p class="note">主が始めるのを待っています…</p>'}
    <button class="o2" id="oniBack">タイトルへ</button>`;
@@ -1890,7 +1893,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
   teardown(); pl.forEach(p=>{ if(p.id!==net.myId||true) avFor(p); });
-  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; window._escShown=0; el('fudaN').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
+  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; window._escShown=0; el('fudaN').hidden=true; document.body.classList.add('ingame'); el('spotsBtn').hidden=true; el('poi').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
   if(resume){ say('','部屋に戻りました。続きから！',3.5); return; }
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
@@ -1925,6 +1928,11 @@ const EXITG=(()=>{ const g=new THREE.Group(); const st=new THREE.MeshStandardMat
   const gate=new THREE.Mesh(new THREE.PlaneGeometry(4,4),new THREE.MeshBasicMaterial({color:'#c8d8ff',transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false})); gate.position.y=2; g.add(gate);
   g.position.set(EXIT.x,terrH(EXIT.x,EXIT.z),EXIT.z); g.visible=false; scene.add(g); return g; })();
 
+/* ---------- ミニマップに仲間を表示 ---------- */
+GAMEMINI=(mg,W,scale,lv)=>{ if(!GAMEMODE||!V) return; V.pl.forEach(q=>{ if(q[0]===net.myId||q[11]) return; const r=ROSTER.find(p=>p.id===q[0]); if(!r||r.role!==myRole) return; if(lvlOf(q[1],q[2],q[3])!==lv) return;
+    let dx=(q[1]-P.x)*scale+W/2, dz=(q[3]-P.z)*scale+W/2; dx=Math.max(8,Math.min(W-8,dx)); dz=Math.max(8,Math.min(W-8,dz));
+    mg.beginPath(); mg.arc(dx,dz,7,0,PI*2); mg.fillStyle=q[7]?'#f0e6d2':(myRole==='oni'?'#ff5050':'#5aa0ff'); mg.fill(); mg.lineWidth=2; mg.strokeStyle='#000'; mg.stroke();
+    if(q[7]){ mg.fillStyle='#7a1018'; mg.font='bold 10px sans-serif'; mg.textAlign='center'; mg.textBaseline='middle'; mg.fillText('!',dx,dz+.5); } }); };
 /* ---------- 毎フレーム ---------- */
 LOCKMOVE=()=>{ if(!GAMEMODE) return false; if(V&&V.pre>0&&myRole==='oni') return true; const mine=V&&V.pl.find(q=>q[0]===net.myId); return !!(mine&&(mine[7]||mine[11])); };
 WALKSPD=()=>GAMEMODE&&myRole==='oni'?2.1*OSCALE:2.1;
@@ -1969,7 +1977,7 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   const wN=nearWax(); const rb=el('oniRescue'); rb.hidden=!wN||!!iamWax||!!iEsc; if(wN){ const R0=ROSTER.find(p=>p.id===wN[0]); rb.querySelector('b').textContent='長押しで助ける：'+(R0?R0.n:''); rb.querySelector('i').style.width=Math.min(100,(wN[8]||0)/3*100)+'%'; }
   if(meA){ if(!meA.keyM){ meA.keyM=keyMesh(); meA.keyM.scale.setScalar(.7); meA.keyM.position.set(.3,1.0,-.15); meA.av.g.add(meA.keyM); } meA.keyM.visible=!!iKey; meA.av.g.visible=!HIDDEN&&!iEsc; }
   el('oniWax').hidden=!iamWax; if(iamWax) el('oniWaxBar').style.width=Math.min(100,mine[8]/3*100)+'%';
-  el('oniStam').hidden=myRole!=='run'||iamWax; el('oniStamBar').style.width=(stamina/6*100)+'%';
+  el('oniStam').hidden=myRole!=='run'||iamWax||iEsc; el('oniStamBar').style.width=(stamina/6*100)+'%';
   // 隠れる/調べるボタン
   const hb=$('hideBtn'); if(myRole==='oni'){ hb.hidden=true; }
   else if(iamWax||iEsc) hb.hidden=true;
@@ -1994,7 +2002,7 @@ ANIM.push(t=>{ if(PV&&START){ PV.o.update(t,false); PV.g.rotation.y=Math.sin(t*.
   const te=el('tEra').onclick; el('tEra').onclick=()=>{ if(!GAMEMODE) te(); else say('','鬼ごっこは「あの夜」で遊びます',2); }; }
 /* ---------- 起動 ---------- */
 el('start').hidden=true; showTitle();
-window.__oni={get G(){return G;},get V(){return V;},net,NAV:()=>NAV,buildNav,host,hostStart,me};
+window.__oni={get G(){return G;},get ROSTER(){return ROSTER;},get V(){return V;},net,NAV:()=>NAV,buildNav,host,hostStart,me};
 return {};
 })();
 
