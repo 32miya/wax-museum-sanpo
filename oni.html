@@ -176,6 +176,9 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 #oniTime{font-family:var(--f-disp);font-weight:800;font-size:28px;letter-spacing:.05em}#oniTime.pre{color:var(--shu2);font-size:18px}
 #oniCount{font-size:12px;color:var(--mute)}
 #oniGoal{font-size:12px;margin-top:4px;max-width:58vw;line-height:1.5}#oniGoal.key{color:#bcd0ff;font-weight:700}
+#oniCrouch{position:fixed;z-index:6;left:calc(env(safe-area-inset-left,0px) + 120px);bottom:calc(env(safe-area-inset-bottom,0px) + 182px);width:70px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:700;font-size:12px;cursor:pointer}
+#oniCrouch.on{background:#2a3a5a;border-color:#9ab4ff}
+body:not(.touchui) #oniCrouch{left:calc(env(safe-area-inset-left,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
 #oniRescue{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:7;min-width:220px;height:60px;border-radius:16px;border:1px solid rgba(224,49,59,.8);background:rgba(90,8,14,.9);color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;-webkit-user-select:none;user-select:none;touch-action:none}
 body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
 #oniRescue b{font-size:14px}#oniRescue span{width:80%;height:6px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden}#oniRescue i{display:block;height:100%;width:0;background:#fff}
@@ -294,6 +297,7 @@ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 <div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniGoal"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
 <div id="oniWax" hidden><b>蝋人形にされた……</b><span>仲間にふれてもらうと動けるようになる</span><div class="bar"><i id="oniWaxBar"></i></div></div>
 <section id="oniEnd" hidden></section>
+<button id="oniCrouch" hidden>しゃがむ</button>
 <button id="oniRescue" hidden><b>長押しで助ける</b><span><i></i></span></button>
 <section id="oniDrop" hidden></section>
 <div id="oniSpec" hidden><button id="oniSpecL" aria-label="前の仲間">◀</button><div><small>観戦中</small><b id="oniSpecN"></b></div><button id="oniSpecR" aria-label="次の仲間">▶</button></div>
@@ -1706,7 +1710,13 @@ function flow(goal){ const D=new Map(); if(!goal) return D; const q=[goal]; D.se
 /* ---------- 見える・当たる ---------- */
 function pointBlocked(x,y,z){ const l=CG.get(Math.floor(x/CGS)+','+Math.floor(z/CGS)); if(l) for(const b of l){ if(y<b.y0||y>b.y1) continue; if(x>b.x0-.05&&x<b.x1+.05&&z>b.z0-.05&&z<b.z1+.05) return true; } return false; }
 function slabBetween(x,z,y0,y1){ const lo=Math.min(y0,y1),hi=Math.max(y0,y1); for(const s of SLABS){ if(s.y-.25>lo&&s.y-.25<hi&&x>=s.x0&&x<=s.x1&&z>=s.z0&&z<=s.z1) return true; } if(inR(FOOT,x,z)&&hi>H2-.3&&lo<H2-.3) return true; return false; }
-function sees(a,b){ const dx=b.x-a.x,dz=b.z-a.z,dy=b.y-a.y, d=Math.hypot(dx,dz); if(d>17||Math.abs(dy)>1.8) return false; const n=Math.ceil(d/.5); for(let i=1;i<n;i++){ const t=i/n; if(pointBlocked(a.x+dx*t,a.y+1.2+dy*t,a.z+dz*t)) return false; } return true; }
+function sees(a,b){ const dx=b.x-a.x,dz=b.z-a.z,dy=b.y-a.y, d=Math.hypot(dx,dz); if(d>17||Math.abs(dy)>1.8) return false;
+  const low=b.cr&&d>2.5; // しゃがんでいる相手は、すぐそばでなければ体の低いところしか見えない
+  const ey=a.y+1.55, ty=b.y+(low?.55:1.3), n=Math.ceil(d/.4);
+  for(let i=1;i<n;i++){ const t=i/n; if(pointBlocked(a.x+dx*t,ey+(ty-ey)*t,a.z+dz*t)) return false; }
+  if(low&&outdoorFogged(b)&&d>7) return false; // 霧の中でしゃがむと遠くからは見えない
+  return true; }
+function outdoorFogged(b){ return !inR(FOOT,b.x,b.z,1)&&b.y<2; }
 
 /* ---------- 主：ゲーム進行 ---------- */
 const OSPD=[5.0,4.6,4.4,5.2,5.4,4.3].map(v=>v*OSCALE); // 鬼ごとの全力
@@ -1724,7 +1734,7 @@ function newGame(){ const pl=lobby.map((L,i)=>({id:L.id,n:L.n,role:L.role,ch:L.c
   if(G.pl.some(p=>p.ai)&&!NAV) buildNav();
   return G; }
 function hostEvent(m){ broadcast({t:'ev',m}); onEv(m); }
-function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free'){ me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; me0.rs=rescueTarget(); } }
+function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free'){ me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; me0.rs=rescueTarget(); me0.cr=CROUCH?1:0; } }
   if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent('鬼が動き出した！'); }
   else G.t-=dt;
   // AI鬼
@@ -1841,7 +1851,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden||leaving) 
   if(net.peer&&net.peer.disconnected&&!net.peer.destroyed){ try{ net.peer.reconnect(); }catch(e){} }
   if(net.mode==='client'&&everJoined&&(!net.host||!net.host.open||Date.now()-lastRx>5000)&&!retryT){ retryN=0; dropped(); } });
 function hostMsg(id,m){ if(m.t==='ping') return; if(m.t==='pick'){ const l=lobby.find(l=>l.id===id); if(l){ l.role=m.role==='oni'?'oni':'run'; l.ch=+m.ch||0; } pushLobby(); }
-  else if(m.t==='st'&&G){ const p=G.pl.find(p=>p.id===id); if(!p) return; if(p.away){ p.away=false; p.awayT=0; } if(p.st==='wax'||p.st==='esc'){ return; } p.x=m.x; p.y=m.y; p.z=m.z; p.yaw=m.yaw; p.mv=m.mv; p.hid=m.hid; p.rs=m.rs==null?-1:m.rs; }
+  else if(m.t==='st'&&G){ const p=G.pl.find(p=>p.id===id); if(!p) return; if(p.away){ p.away=false; p.awayT=0; } if(p.st==='wax'||p.st==='esc'){ return; } p.x=m.x; p.y=m.y; p.z=m.z; p.yaw=m.yaw; p.mv=m.mv; p.hid=m.hid; p.rs=m.rs==null?-1:m.rs; p.cr=m.cr?1:0; }
   else if(m.t==='search'&&G&&G.pre<=0){ const p=G.pl.find(p=>p.id===id); if(p&&p.role==='oni') hostSearch(p,m.spot); } }
 function pushLobby(){ const m={t:'lobby',list:lobby,code:net.code,set:SET}; broadcast(m); if(!inGame) showLobby(); }
 function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
@@ -1854,7 +1864,7 @@ function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
   else if(m.t==='end'){ onEnd(m); }
   else if(m.t==='back'){ ended=false; inGame=false; el('oniEnd').hidden=true; teardown(); GAMEMODE=false; START=true; showLobby(); }
   else if(m.t==='bye'){ leaving=true; dropUI(0); try{ localStorage.removeItem('oni_last'); }catch(e){} lobbyMsg('主が部屋を閉じました'); } }
-function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0,p.key>=0?1:0,p.st==='esc'?1:0]),k:G.keys.map(k=>[k.x,k.y,k.z,k.by])}; }
+function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0,p.key>=0?1:0,p.st==='esc'?1:0,p.cr?1:0]),k:G.keys.map(k=>[k.x,k.y,k.z,k.by])}; }
 
 /* ---------- 画面（タイトル・控え室） ---------- */
 function lobbyMsg(s){ const L=el('oniL'); L.hidden=false; el('oniLbody').innerHTML=`<p class="lmsg">${esc(s)}</p><button class="o2" id="oniBack">タイトルへ</button>`; el('oniBack').onclick=()=>location.reload(); }
@@ -1900,7 +1910,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
   teardown(); pl.forEach(p=>{ if(p.id!==net.myId||true) avFor(p); });
-  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; window._escShown=0; el('fudaN').hidden=true; document.body.classList.add('ingame'); el('spotsBtn').hidden=true; el('poi').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
+  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; OBST.g.visible=true; window._escShown=0; el('fudaN').hidden=true; document.body.classList.add('ingame'); el('spotsBtn').hidden=true; el('poi').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
   if(resume){ say('','部屋に戻りました。続きから！',3.5); return; }
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
@@ -1915,6 +1925,12 @@ function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=fals
 let LOCKBY=false;
 function forceUnhide(){ if(HIDDEN) hideOut(); }
 
+/* ---------- しゃがむ ---------- */
+let CROUCH=false;
+function setCrouch(v){ CROUCH=!!v&&myRole==='run'; el('oniCrouch').classList.toggle('on',CROUCH); el('oniCrouch').textContent=CROUCH?'立つ':'しゃがむ'; if(CROUCH){ IN.run=false; el('runBtn').setAttribute('aria-pressed','false'); } }
+el('oniCrouch').onclick=()=>setCrouch(!CROUCH);
+addEventListener('keydown',e=>{ if(e.code==='KeyC'&&GAMEMODE&&!e.repeat) setCrouch(!CROUCH); });
+el('runBtn').addEventListener('click',()=>{ if(CROUCH&&IN.run) setCrouch(false); });
 /* ---------- 救出（長押し3秒） ---------- */
 let rescueHold=false, rescueId=-1;
 function nearWax(){ if(!V||myRole!=='run'||HIDDEN) return null; let best=null,bd=1.6; V.pl.forEach(q=>{ if(q[0]===net.myId||!q[7]) return; const d=Math.hypot(q[1]-P.x,q[3]-P.z); if(d<bd&&Math.abs(q[2]-P.y)<1.2){ bd=d; best=q; } }); return best; }
@@ -1922,6 +1938,31 @@ function rescueTarget(){ if(!rescueHold) return -1; const w=nearWax(); if(!w||w[
 { const b=el('oniRescue'); const down=e=>{ e.preventDefault(); const w=nearWax(); if(!w) return; rescueHold=true; rescueId=w[0]; b.classList.add('on'); }; const up=()=>{ rescueHold=false; b.classList.remove('on'); };
   b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); b.addEventListener('pointerleave',up);
   addEventListener('keydown',e=>{ if(e.code==='KeyR'&&!e.repeat&&GAMEMODE){ const w=nearWax(); if(w){ rescueHold=true; rescueId=w[0]; } } }); addEventListener('keyup',e=>{ if(e.code==='KeyR') rescueHold=false; }); }
+/* ---------- 物陰（しゃがめば隠れる低い障害物） ---------- */
+const OBST=(function(){ const B={wood:new Batch(BK.wood.mat,1.2),bark:new Batch(M.bark,2),rock:new Batch(M.stoneD,2.4),hedge:new Batch(M.hedge,1),iron:new Batch(M.iron,1)}; let n=0;
+  const free=(x,z,y,r)=>{ for(let a=0;a<6.28;a+=.8){ if(blocked(x+Math.cos(a)*r,z+Math.sin(a)*r,y)) return false; } return !blocked(x,z,y); };
+  const crate=(x,y,z,s,ry)=>{ s=s||1; B.wood.add(BOXG,TM(x,y+.5*s,z,ry||0,s,s,s)); for(const yy of [.08,.92]) B.iron.add(BOXG,TM(x,y+yy*s,z,ry||0,s*1.02,.05,s*1.02)); collide(x-.5*s,x+.5*s,z-.5*s,z+.5*s,y,y+s); n++; };
+  const barrel=(x,y,z)=>{ B.wood.add(lathe([[0,0],[.34,0],[.4,.5],[.34,1.0],[0,1.0]],12),TM(x,y,z)); for(const yy of [.15,.85]) B.iron.add(new THREE.TorusGeometry(.37,.02,4,14),TM(x,y+yy,z,0,1,1,1,PI/2)); collide(x-.38,x+.38,z-.38,z+.38,y,y+1.0); n++; };
+  const bench=(x,y,z,ry,L)=>{ L=L||1.8; const c=Math.abs(Math.sin(ry))>.5; B.wood.add(BOXG,TM(x,y+.5,z,ry,L,.08,.5)); B.wood.add(BOXG,TM(x,y+.85,z-(c?0:.22),ry,L,.5,.06)); for(const s of [-1,1]) B.wood.add(BOXG,TM(x+(c?0:s*(L/2-.1)),y+.25,z+(c?s*(L/2-.1):0),ry,.08,.5,.45)); collide(x-(c?.3:L/2),x+(c?.3:L/2),z-(c?L/2:.3),z+(c?L/2:.3),y,y+1.1); n++; };
+  const log=(x,y,z,ry,L)=>{ B.bark.add(new THREE.CylinderGeometry(.36,.42,L,8),TM(x,y+.38,z,ry,1,1,1,0,PI/2)); const c=Math.abs(Math.cos(ry))>.7; collide(x-(c?L/2:.42),x+(c?L/2:.42),z-(c?.42:L/2),z+(c?.42:L/2),y,y+.85); n++; };
+  const rock=(x,y,z,s)=>{ B.rock.add(new THREE.DodecahedronGeometry(s,0),TM(x,y+s*.45,z,rnd()*6,1.2,.85,1)); collide(x-s,x+s,z-s,z+s,y,y+s*1.05); n++; };
+  const bush=(x,y,z)=>{ for(let i=0;i<4;i++) B.hedge.add(new THREE.DodecahedronGeometry(R(.45,.6),0),TM(x+R(-.4,.4),y+R(.35,.55),z+R(-.4,.4),rnd()*6,1,R(.8,1),1)); collide(x-.7,x+.7,z-.7,z+.7,y,y+1.05); n++; };
+  // 森：獣道のわきに倒木・岩・茂み
+  for(const T of TRAILS) for(let i=0;i<T.length-1;i++){ const a=T[i],b=T[i+1],L=Math.hypot(b[0]-a[0],b[1]-a[1]); for(let s=6;s<L;s+=R(9,15)){ const t=s/L, px=a[0]+(b[0]-a[0])*t, pz=a[1]+(b[1]-a[1])*t; if(inR(ESTATE,px,pz,4)) continue;
+      const nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L, side=rnd()<.5?-1:1, off=R(2.6,4.2), x=px+nx*off*side, z=pz+nz*off*side, y=terrH(x,z);
+      if(pathD(x,z)<2.3||!free(x,z,y,1.0)) continue; const k=rnd(); if(k<.4) log(x,y,z,Math.atan2(b[0]-a[0],b[1]-a[1])+R(-.3,.3),R(2.4,3.6)); else if(k<.7) rock(x,y,z,R(.7,.95)); else bush(x,y,z); } }
+  // 庭・墓地
+  for(let i=0;i<40;i++){ const x=R(-40,40), z=R(-44,44); if(inR(FOOT,x,z,2.5)||(Math.abs(x)<3&&z>30)||inR({x0:-4,x1:4,z0:-50,z1:-40},x,z)) continue; if(!free(x,0,0,1.0)) continue; const k=rnd(); if(k<.45) bush(x,0,z); else if(k<.7) crate(x,0,z,R(.9,1.05),R(0,1)); else barrel(x,0,z); }
+  // 館の中
+  for(const z of [-4,6,16,26]) bench(-10.6,0,z,0,1.8);            // 回廊の長椅子
+  crate(-4.3,0,25.2); crate(-4.3,0,24.1,.8); barrel(4.4,0,25.6);   // 玄関ホール
+  crate(15.6,0,18.6); crate(9,0,21.3,.9); barrel(16.6,0,25.2);       // 工房
+  crate(-5,0,-8.6); crate(4.8,0,-8.6,.9); barrel(-5,0,6);             // 儀式の間の隅
+  bench(10.4,H1,6,PI/2,2); bench(10.4,H1,-6,PI/2,2); crate(8.2,H1,0); // 肖像画の間
+  crate(-8,H1,24); barrel(-17.5,H1,12.5);                          // 書斎
+  crate(-8,H1,-3); crate(-18.2,H1,5,.9);                            // 開かずの一室
+  crate(9.6,-4,-1.5); crate(16.4,-4,-1.5); crate(9.6,-4,4.5,.9); crate(16.4,-4,4.5); barrel(12.8,-4,10); barrel(10,-4,12); // 地下
+  const g=new THREE.Group(); scene.add(g); for(const k in B) B[k].build(g); g.visible=false; return {g,n}; })();
 /* ---------- 銀の鍵と森の出口（見た目） ---------- */
 const KEYV=[]; const keyGeo=(()=>{ const g=new THREE.Group(); const m=new THREE.MeshStandardMaterial({color:'#dfe6f0',metalness:1,roughness:.2,emissive:'#6a7a9a',emissiveIntensity:.6});
   const ring=new THREE.Mesh(new THREE.TorusGeometry(.11,.025,8,16),m); ring.position.y=.2; g.add(ring); const sh=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.32,6),m); sh.position.y=-.05; g.add(sh); for(const y of [-.16,-.1]){ const t=new THREE.Mesh(new THREE.BoxGeometry(.08,.03,.025),m); t.position.set(.04,y,0); g.add(t); } return g; })();
@@ -1942,8 +1983,8 @@ GAMEMINI=(mg,W,scale,lv)=>{ if(!GAMEMODE||!V) return; V.pl.forEach(q=>{ if(q[0]=
     if(q[7]){ mg.fillStyle='#7a1018'; mg.font='bold 10px sans-serif'; mg.textAlign='center'; mg.textBaseline='middle'; mg.fillText('!',dx,dz+.5); } }); };
 /* ---------- 毎フレーム ---------- */
 LOCKMOVE=()=>{ if(!GAMEMODE) return false; if(V&&V.pre>0&&myRole==='oni') return true; const mine=V&&V.pl.find(q=>q[0]===net.myId); return !!(mine&&(mine[7]||mine[11])); };
-WALKSPD=()=>GAMEMODE&&myRole==='oni'?2.1*OSCALE:2.1;
-RUNSPD=()=>{ if(!GAMEMODE) return 4.6; if(myRole==='oni'){ const m=ROSTER.find(p=>p.id===net.myId); return OSPD[m?m.ch:0]; } return stamina>0?4.6:2.6; };
+WALKSPD=()=>GAMEMODE&&myRole==='oni'?2.1*OSCALE:(GAMEMODE&&CROUCH?1.35:2.1);
+RUNSPD=()=>{ if(!GAMEMODE) return 4.6; if(myRole==='oni'){ const m=ROSTER.find(p=>p.id===net.myId); return OSPD[m?m.ch:0]; } if(CROUCH) return 1.35; return stamina>0?4.6:2.6; };
 let stamina=6, camD=3.4;
 /* ---------- 観戦（脱出した後、まだ逃げている仲間の視点で見る） ---------- */
 let SPEC={on:false,id:-1,off:0,lastYaw:0};
@@ -1952,7 +1993,7 @@ function specSwitch(d){ const L=specList(); if(!L.length){ SPEC.id=-1; return; }
 el('oniSpecL').onclick=()=>specSwitch(-1); el('oniSpecR').onclick=()=>specSwitch(1);
 GAMECAM=(bob,moving,dt)=>{ if(!GAMEMODE){ camera.position.set(P.x,P.y+1.6+bob,P.z); camera.rotation.set(P.pitch,P.yaw,0); return; }
   if(SPEC.on&&SPEC.hid>=0){ const h=HIDES[SPEC.hid]; camera.position.set(h.x,h.y+h.eye,h.z); camera.rotation.set(h.lie?1.1:Math.max(h.pmin,Math.min(h.pmax,P.pitch)),h.yaw+Math.max(-h.yr,Math.min(h.yr,SPEC.off)),0); return; }
-  const head=V3(P.x,P.y+1.55,P.z), fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw); const pit=Math.max(-.9,Math.min(.6,P.pitch)); const elev=.32-pit*.75, want=3.4;
+  const head=V3(P.x,P.y+(CROUCH?1.05:1.55),P.z), fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw); const pit=Math.max(-.9,Math.min(.6,P.pitch)); const elev=(CROUCH?.55:.32)-pit*.75, want=CROUCH?3.0:3.4;
   const dir=V3(-fx*Math.cos(elev),Math.sin(elev),-fz*Math.cos(elev));
   let d=.3; for(;d<want;d+=.12){ const x=head.x+dir.x*d,y=head.y+dir.y*d,z=head.z+dir.z*d; if(pointBlocked(x,y,z)||slabBetween(x,z,head.y,y+.25)) break; }
   d=Math.max(.35,d-.25); camD+=(d-camD)*(d<camD?1:Math.min(1,dt*3));
@@ -1964,14 +2005,14 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   const meA=AV.get(net.myId); if(meA){ meA.av.g.visible=!HIDDEN; meA.av.g.position.set(P.x,P.y,P.z); meA.av.g.rotation.y=P.yaw+PI; meA.tag.visible=false; meA.av.o.update(t,moving&&!LOCKMOVE()); }
   // 送受信
   if(net.mode==='host'&&G){ hostStep(dt); net.sendT+=dt; if(net.sendT>=1/NET_HZ){ net.sendT=0; V=snap(); if(!net.solo) broadcast(V); } if(!V) V=snap(); }
-  else if(net.mode==='client'){ net.sendT+=dt; if(net.sendT>=1/NET_HZ){ net.sendT=0; toHost({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(2),mv:moving?1:0,hid:HIDDEN?HIDES.indexOf(HIDDEN.h):-1,rs:rescueTarget()}); } }
+  else if(net.mode==='client'){ net.sendT+=dt; if(net.sendT>=1/NET_HZ){ net.sendT=0; toHost({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(2),mv:moving?1:0,hid:HIDDEN?HIDES.indexOf(HIDDEN.h):-1,rs:rescueTarget(),cr:CROUCH?1:0}); } }
   if(!V) return;
   // 他の人
   const k=Math.min(1,dt*10);
-  V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res,away,hasKey,esc]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
+  V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res,away,hasKey,esc,cr]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
     const R0=ROSTER.find(p=>p.id===id); if(!R0) return; const A=avFor(R0); if(!(A.x===A.x)||A.x==null){ A.x=x; A.y=y; A.z=z; A.yaw=yaw; }
     A.x+=(x-A.x)*k; A.y+=(y-A.y)*k; A.z+=(z-A.z)*k; let dy=yaw-A.yaw; dy=((dy+PI)%(2*PI)+2*PI)%(2*PI)-PI; A.yaw+=dy*k;
-    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0&&!esc; A.tag.visible=!(SPEC.on&&SPEC.id===id); A.tag.material.opacity=away?.35:1; if(A.keyM) A.keyM.visible=!!hasKey; A.av.o.update(t+id,!!mv&&!wax);
+    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0&&!esc; A.tag.visible=!(SPEC.on&&SPEC.id===id)&&!(cr&&myRole==='oni'); A.av.g.scale.y=cr?.66:1; A.tag.material.opacity=away?.35:1; if(A.keyM) A.keyM.visible=!!hasKey; A.av.o.update(t+id,!!mv&&!wax);
     if(A.wax!==!!wax){ A.wax=!!wax; waxify(A.av.g,A.wax); } });
   // 銀の鍵
   if(V.k){ while(KEYV.length<V.k.length){ const m=keyMesh(); scene.add(m); KEYV.push(m); } KEYV.forEach((m,i)=>{ const k=V.k[i]; m.visible=!!k&&k[3]<0; if(k){ m.position.set(k[0],k[1]+.9+Math.sin(t*2+i)*.1,k[2]); m.rotation.y=t*1.5; } }); }
@@ -1996,7 +2037,8 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   el('oniGoal').textContent=myRole==='oni'?'迷い人を全員捕まえろ。鍵を持つ者を出口へ行かせるな':iEsc?'脱出成功！ 仲間の様子を観戦中':iamWax?'':iKey?'銀の鍵を持っている！ 北の「森の出口」へ':'館のどこかにある「銀の鍵」を探せ（地図に◆）';
   el('oniGoal').classList.toggle('key',!!iKey);
   const wN=nearWax(); const rb=el('oniRescue'); rb.hidden=!wN||!!iamWax||!!iEsc; if(wN){ const R0=ROSTER.find(p=>p.id===wN[0]); rb.querySelector('b').textContent='長押しで助ける：'+(R0?R0.n:''); rb.querySelector('i').style.width=Math.min(100,(wN[8]||0)/3*100)+'%'; }
-  if(meA){ if(!meA.keyM){ meA.keyM=keyMesh(); meA.keyM.scale.setScalar(.7); meA.keyM.position.set(.3,1.0,-.15); meA.av.g.add(meA.keyM); } meA.keyM.visible=!!iKey; meA.av.g.visible=!HIDDEN&&!iEsc; }
+  if(meA){ if(!meA.keyM){ meA.keyM=keyMesh(); meA.keyM.scale.setScalar(.7); meA.keyM.position.set(.3,1.0,-.15); meA.av.g.add(meA.keyM); } meA.keyM.visible=!!iKey; meA.av.g.visible=!HIDDEN&&!iEsc; meA.av.g.scale.y=CROUCH?.66:1; }
+  el('oniCrouch').hidden=myRole!=='run'||!!iamWax||!!iEsc||!!HIDDEN; if((iamWax||iEsc||HIDDEN)&&CROUCH) setCrouch(false);
   el('oniWax').hidden=!iamWax; if(iamWax) el('oniWaxBar').style.width=Math.min(100,mine[8]/3*100)+'%';
   el('oniStam').hidden=myRole!=='run'||iamWax||iEsc; el('oniStamBar').style.width=(stamina/6*100)+'%';
   // 隠れる/調べるボタン
@@ -2023,7 +2065,7 @@ ANIM.push(t=>{ if(PV&&START){ PV.o.update(t,false); PV.g.rotation.y=Math.sin(t*.
   const te=el('tEra').onclick; el('tEra').onclick=()=>{ if(!GAMEMODE) te(); else say('','鬼ごっこは「あの夜」で遊びます',2); }; }
 /* ---------- 起動 ---------- */
 el('start').hidden=true; showTitle();
-window.__oni={get G(){return G;},get ROSTER(){return ROSTER;},get V(){return V;},net,NAV:()=>NAV,buildNav,host,hostStart,me};
+window.__oni={sees,get OBSTN(){return OBST.n;},get G(){return G;},get ROSTER(){return ROSTER;},get V(){return V;},net,NAV:()=>NAV,buildNav,host,hostStart,me};
 return {};
 })();
 
