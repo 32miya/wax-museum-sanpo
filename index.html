@@ -78,6 +78,16 @@ body.touchui #poi{bottom:calc(env(safe-area-inset-bottom,0px) + 234px);max-width
 #poi .go{font-size:12px;color:var(--mute)}
 #hint{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 176px);transform:translateX(-50%);padding:10px 16px;border-radius:14px;max-width:calc(100% - 40px);width:max-content;text-align:center;line-height:1.7;background:var(--panel);font-size:13px;z-index:5;pointer-events:none;font-family:var(--f-disp);border:1px solid var(--line)}
 #hint .who{display:block;font-size:10px;letter-spacing:.2em;color:var(--mute);font-family:var(--f-body)}
+#hideBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:6;height:46px;padding:0 22px;border-radius:999px;border:1px solid rgba(224,49,59,.7);background:rgba(90,8,14,.85);color:#fff;font-weight:700;font-size:15px;cursor:pointer;letter-spacing:.08em;box-shadow:0 0 18px rgba(163,18,27,.5);white-space:nowrap}
+body.touchui #hideBtn{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
+#hideOv{position:fixed;inset:0;z-index:5;pointer-events:none}
+#hideOv .hv{position:absolute;inset:0;background:radial-gradient(ellipse 60% 55% at 50% 50%,rgba(0,0,0,0) 40%,rgba(0,0,0,.85) 100%);animation:breath 3.2s ease-in-out infinite}
+@keyframes breath{0%,100%{opacity:.85}50%{opacity:1}}
+#hideOv .hcap{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 70px);text-align:center;text-shadow:0 1px 8px #000}
+#hideOv .hcap b{display:block;font-family:var(--f-disp);font-size:18px}
+#hideOv .hcap span{font-size:11px;color:var(--mute);letter-spacing:.1em}
+#unhideBtn{pointer-events:auto;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 30px);height:46px;padding:0 26px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px;cursor:pointer}
+body.hiding #pad .pbase#stickBase,body.hiding #runBtn,body.hiding #poi{display:none!important}
 #toast{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:9;pointer-events:none;text-align:center;font-family:var(--f-disp);opacity:0;transition:opacity .5s}
 #toast .f{display:inline-block;writing-mode:vertical-rl;padding:18px 12px;background:#e9dcc3;color:#2a0d0d;border:3px double #6b1a14;font-size:22px;font-weight:800;letter-spacing:.15em;box-shadow:0 10px 40px rgba(0,0,0,.7)}
 #toast small{display:block;margin-top:10px;font-size:12px;color:var(--ink);text-shadow:0 1px 6px #000;font-family:var(--f-body)}
@@ -178,6 +188,8 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 
 <button id="poi" hidden><span class="dia"></span><span class="nm" id="poiName"></span><span class="go">解説</span></button>
 <div id="hint" hidden></div>
+<button id="hideBtn" hidden>隠れる</button>
+<div id="hideOv" hidden><div class="hv"></div><div class="hcap"><b id="hideName"></b><span>息をひそめて……見回すことだけできます</span></div><button id="unhideBtn">出る</button></div>
 <div id="toast"><div class="f" id="toastF"></div><small id="toastS"></small></div>
 
 <section id="card" hidden aria-live="polite">
@@ -523,10 +535,10 @@ wall('x',30,-20.25,20.25,0,H2,.5,'stone',S_OPS);
 const N_OPS=[win('x',-10,0,4.2,1.6,7.0,-1,0,1), win('x',-10,-16,1.4,1.1,3.1,-1,0), win('x',-10,-10,1.4,1.1,3.1,-1,0), win('x',-10,9,1.4,1.1,3.1,-1,1), [13.3,14.9,0,2.5], win('x',-10,18,1.0,1.1,3.1,-1,1),
   win('x',-10,-13,1.0,5.6,7.2,-1,0), win('x',-10,10,1.4,5.2,7.4,-1,0), win('x',-10,16,1.4,5.2,7.4,-1,0)];
 wall('x',-10,-20.25,20.25,0,H2,.5,'stone',N_OPS);
-const W_OPS=[win('z',-20,-4,1.5,1.0,3.1,-1,0), win('z',-20,4,1.5,1.0,3.1,-1,0), win('z',-20,12,1.5,1.0,3.1,-1,0), win('z',-20,20,1.5,1.0,3.1,-1,0), win('z',-20,26,1.5,1.0,3.1,-1,0),
+const W_OPS=[win('z',-20,-4,1.5,1.0,3.1,-1,0), win('z',-20,4,1.5,1.0,3.1,-1,0), [10.1,11.9,0,2.6], win('z',-20,20,1.5,1.0,3.1,-1,0), win('z',-20,26,1.5,1.0,3.1,-1,0),
   win('z',-20,0,1.0,5.6,7.2,-1,0), win('z',-20,18,1.4,5.2,7.4,-1,1), win('z',-20,25,1.4,5.2,7.4,-1,1)];
 wall('z',-20,-10,30,0,H2,.5,'stone',W_OPS);
-const E_OPS=[win('z',20,-4,1.5,1.0,3.1,1,1), win('z',20,4,1.5,1.0,3.1,1,1), win('z',20,22,1.4,1.4,3.1,1,0),
+const E_OPS=[[26.1,27.9,0,2.6], win('z',20,-4,1.5,1.0,3.1,1,1), win('z',20,4,1.5,1.0,3.1,1,1), win('z',20,22,1.4,1.4,3.1,1,0),
   win('z',20,-4,1.4,5.2,7.4,1,0), win('z',20,4,1.4,5.2,7.4,1,0), win('z',20,16,1.4,5.2,7.4,1,0), win('z',20,24,1.4,5.2,7.4,1,0)];
 wall('z',20,-10,30,0,H2,.5,'stone',E_OPS);
 // 内壁
@@ -545,7 +557,7 @@ function floorPlate(x0,x1,z0,z1,y,top,bot){ boxAt(top,x0,x1,y-.2,y,z0,z1); if(bo
 floorPlate(-20,-6,-10,30,0,'floor'); floorPlate(-6,6,14,30,0,'floor'); floorPlate(-6,6,-10,14,0,'stoneD');
 floorPlate(6,20,-10,14,0,'floor','stoneD'); floorPlate(6,17,14,30,0,'stoneD','stoneD'); floorPlate(17,20,26,30,0,'stoneD','stoneD'); floorPlate(19.6,20,14,26,0,'stoneD','stoneD');
 // 2F
-floorPlate(-20,-6,-10,30,H1,'floor','plaster'); floorPlate(6,20,-10,30,H1,'floor','plaster'); floorPlate(-6,6,14,17,H1,'floor','plaster');
+floorPlate(-20,-6,-10,30,H1,'floor','plaster'); floorPlate(6,20,-10,-2,H1,'floor','plaster'); floorPlate(7.9,20,-2,8,H1,'floor','plaster'); floorPlate(6,20,8,30,H1,'floor','plaster'); floorPlate(-6,6,14,17,H1,'floor','plaster');
 boxAt('plaster',-20,20,H2-.2,H2,-10,30); // 天井
 // 地下床
 floorPlate(6,20,-10,28,-4,'stoneD');
@@ -562,6 +574,11 @@ for(const sx of [-2.05,2.05]){ for(let i=0;i<=10;i++){ const z=17+i, y=H1-(H1*i/
 // 2F踊り場の手すり（吹き抜け側）
 for(let x=-6;x<=6;x+=.4){ if(Math.abs(x)<2.1) continue; boxAt('woodR',x-.03,x+.03,H1,H1+1,16.95,17.05); }
 boxAt('woodR',-6,-2,H1+.95,H1+1.05,16.92,17.08); boxAt('woodR',2,6,H1+.95,H1+1.05,16.92,17.08); collide(-6,-2,16.9,17.1,H1,H1+1.1); collide(2,6,16.9,17.1,H1,H1+1.1);
+// 裏階段（晩餐の間 ⇄ 肖像画の間）
+stairs(6.15,7.9,-2,8,H1,0,'z','woodR'); RAMPS.push({x0:6.15,x1:7.9,z0:-2.45,z1:-1.95,ya:H1,yb:H1,ax:'z'});
+for(let i=0;i<=10;i++){ const z=-2+i, y=H1-H1*i/10; boxAt('woodR',7.92,7.98,y,y+1.0,z-.03,z+.03); } bk('woodR').add(BOXG,TM(7.95,H1/2+1.0,3,0,.08,.08,Math.hypot(10,H1),Math.atan2(H1,10)));
+collide(7.9,8.0,-2,8,0,H1+1.1); collide(6.1,7.95,-2.15,-1.95,0,H1-.4);
+for(let x=6.2;x<=7.9;x+=.35) boxAt('woodR',x-.03,x+.03,H1,H1+1,7.97,8.03); boxAt('woodR',6.15,7.95,H1+.95,H1+1.03,7.95,8.05); collide(6.1,8,7.92,8.1,H1,H1+1.1);
 // 地下への階段（工房）
 stairs(17.1,19.6,14.2,26,0,-4,'z','stoneD');
 RAMPS.push({x0:17.1,x1:19.6,z0:26,z1:28,ya:-4,yb:-4,ax:'z'});
@@ -741,6 +758,52 @@ doorFrame('z',6,14.35,16.85,H1,2.7,['衣装部屋','二階の踊り場']);
 doorFrame('x',10,-14.4,-11.6,H1,2.8,['老人の書斎','開かずの一室']);
 doorFrame('x',10,11.6,14.4,H1,2.8,['衣装部屋','肖像画の間']);
 
+/* ---------- 隠れ場所 ---------- */
+const HIDES=[];
+const HWOOD=std({map:TX.floorD,color:'#6a4a34',roughness:.6,side:THREE.DoubleSide}), HDARK=std({map:TX.floorD,color:'#2a1c14',roughness:.8,side:THREE.DoubleSide});
+function hideSpot(name,kind,x,y,z,yaw,eye,ex,ez,o){ HIDES.push(Object.assign({name,kind,x,y,z,yaw,eye,ex,ez,pmin:-.6,pmax:.5,yr:.7},o||{})); }
+// 箪笥・物置・木箱（正面＝ローカル+z）。扉のすき間から外を覗く
+function wardrobe(x,y,z,ry,o){ o=Object.assign({w:1.3,h:2.2,d:.72,style:'doors'},o); const g=new THREE.Group(), W=o.w,H=o.h,D=o.d; const add=(sx,sy,sz,px,py,pz,m,rot)=>{ const b=new THREE.Mesh(BOXG,m||HWOOD); b.scale.set(sx,sy,sz); b.position.set(px,py,pz); if(rot) b.rotation.y=rot; g.add(b); return b; };
+  add(W,H,.04,0,H/2+.08,-D/2+.02,HDARK); add(.04,H,D,-W/2+.02,H/2+.08,0); add(.04,H,D,W/2-.02,H/2+.08,0); add(W+.08,.08,D+.06,0,H+.12,0); add(W,.06,D,0,.1,0,HDARK);
+  add(W+.16,.14,D+.12,0,H+.22,0); for(const sx of [-1,1]) for(const sz of [-1,1]) add(.08,.1,.08,sx*(W/2-.06),.04,sz*(D/2-.06));
+  if(o.style==='doors'){ const dl=add(W/2-.03,H-.04,.04,-W/4-.015,H/2+.08,D/2-.02); const dr=add(W/2-.03,H-.04,.04,W/4+.03,H/2+.08,D/2+.02); dr.rotation.y=-.08;
+    for(const s of [-1,1]){ add(W/2-.18,H*.38,.015,s*(W/4)+(s>0?.03:-.015),H*.72,D/2+(s>0?.05:.005),HDARK); add(W/2-.18,H*.38,.015,s*(W/4)+(s>0?.03:-.015),H*.3,D/2+(s>0?.05:.005),HDARK); const k=new THREE.Mesh(new THREE.SphereGeometry(.025,8,6),M.brass); k.position.set(s*.06,H*.55,D/2+.05); g.add(k); } }
+  else { for(let yy=.16;yy<H;yy+=.14) add(W-.06,.09,.03,0,yy+.08,D/2-.02); }
+  g.position.set(x,y,z); g.rotation.y=ry; scene.add(g);
+  const c=Math.abs(Math.sin(ry))>.5, hx=c?D/2:W/2, hz=c?W/2:D/2; collide(x-hx,x+hx,z-hz,z+hz,y,y+H+.3);
+  const fx=Math.sin(ry), fz=Math.cos(ry); hideSpot(o.name,o.kind||'cab',x-fx*.08,y,z-fz*.08,ry+PI,o.eye||1.5,x+fx*(D/2+.65),z+fz*(D/2+.65),o.hopt); return g; }
+function coffin(x,y,z,ry,name){ const g=new THREE.Group(); const L=2.0,Wd=.66,Hh=.55; const add=(sx,sy,sz,px,py,pz,m)=>{ const b=new THREE.Mesh(BOXG,m||HDARK); b.scale.set(sx,sy,sz); b.position.set(px,py,pz); g.add(b); return b; };
+  add(L,.05,Wd,0,.03,0); add(L,Hh,.04,0,Hh/2,-Wd/2); add(L,Hh,.04,0,Hh/2,Wd/2); add(.04,Hh,Wd,-L/2,Hh/2,0); add(.04,Hh,Wd,L/2,Hh/2,0);
+  const lid=add(L+.04,.05,Wd,.06,Hh+.06,-.2,HWOOD); lid.rotation.y=.05; const cr=new THREE.Mesh(BOXG,M.brass); cr.scale.set(.5,.02,.06); cr.position.set(.1,Hh+.095,-.07); g.add(cr); const cr2=cr.clone(); cr2.scale.set(.06,.02,.3); g.add(cr2);
+  g.position.set(x,y,z); g.rotation.y=ry; scene.add(g); const c=Math.abs(Math.sin(ry))>.5; collide(x-(c?Wd/2:L/2),x+(c?Wd/2:L/2),z-(c?L/2:Wd/2),z+(c?L/2:Wd/2),y,y+.7);
+  hideSpot(name,'coffin',x,y,z,ry+PI/2,.32,x+(c?-.95:0),z+(c?0:-.95),{pmin:.7,pmax:1.4,yr:.9,lie:1}); return g; }
+// 置き場所
+wardrobe(5.42,0,17.6,-PI/2,{w:1.4,h:2.3,name:'階段脇の物置'});
+wardrobe(-19.38,H1,22.6,PI/2,{w:1.3,name:'書斎の洋服箪笥'});
+wardrobe(-6.55,H1,-5,-PI/2,{w:1.2,h:2.1,name:'開かずの一室の古箪笥'});
+wardrobe(19.42,H1,27.6,-PI/2,{w:1.5,h:2.4,name:'衣装部屋の大箪笥（南）'});
+wardrobe(19.42,H1,13.2,-PI/2,{w:1.5,h:2.4,name:'衣装部屋の大箪笥（北）'});
+wardrobe(8.0,0,28.2,PI,{w:1.0,h:2.0,d:.8,style:'slats',name:'人形用の木箱'});
+wardrobe(13,-4,-9.3,0,{w:1.0,h:2.0,d:.8,style:'slats',name:'保管庫の木箱'});
+wardrobe(35.5,0,-23,-PI/2,{w:2.2,h:2.5,d:1.6,style:'slats',name:'裏庭の物置小屋',eye:1.55});
+coffin(9.2,-4,27.1,0,'地下の棺（西）'); coffin(13.8,-4,27.1,0,'地下の棺（東）');
+// 晩餐の間：テーブルの下（テーブル掛けの裾から覗く）
+for(const s of [-1,1]){ const sk=new THREE.Mesh(new THREE.PlaneGeometry(13.1,.42),std({map:TX.linen,color:'#a8a090',side:THREE.DoubleSide,roughness:1})); sk.rotation.y=PI/2; sk.position.set(13+s*1.04,.57,.5); scene.add(sk); }
+for(const s of [-1,1]){ const sk=new THREE.Mesh(new THREE.PlaneGeometry(2.08,.42),std({map:TX.linen,color:'#a8a090',side:THREE.DoubleSide,roughness:1})); sk.position.set(13,.57,.5+s*6.54); scene.add(sk); }
+hideSpot('晩餐のテーブルの下','table',13,0,3.5,PI/2,.28,15.9,3.5,{pmin:-.2,pmax:.15,yr:1.4});
+// 晩餐の間：東の窓のカーテンの陰
+for(const s of [-1,1]){ const c=new THREE.Mesh(new THREE.PlaneGeometry(1.32,3.75,6,1),std({map:TX.velvet,color:'#8a2a2a',side:THREE.DoubleSide,roughness:1})); const pp=c.geometry.attributes.position; for(let i=0;i<pp.count;i++) pp.setZ(i,Math.sin(pp.getX(i)*9)*.05); c.geometry.computeVertexNormals(); c.rotation.y=PI/2; c.position.set(19.32,1.88,4+s*.69); scene.add(c); }
+boxAt('brass',19.3,19.36,3.75,3.8,2.6,5.4);
+hideSpot('晩餐の間のカーテンの陰','curtain',19.62,0,4,PI/2,1.55,18.6,4,{yr:.5});
+// 回廊：布をかけた台座に紛れる
+{ boxAt('wood',-10.05,-8.95,0,.3,-9.0,-7.9); const sm=std({map:TX.linen,color:'#bfb8a8',transparent:true,opacity:.82,side:THREE.DoubleSide,roughness:1,depthWrite:false}); const s=sheet(-9.5,.3,-8.45,1.9,.95); s.material=sm; collide(-10.05,-8.95,-9.0,-7.9,0,2.2);
+  hideSpot('布をかけた台座（人形のふり）','sheet',-9.5,.3,-8.45,0,1.45,-9.5,-6.9,{yr:3.2,pmin:-.4,pmax:.4}); }
+// 儀式の間：祭壇の幕の下
+hideSpot('祭壇の幕の下','altar',0,0,-6.05,PI,.2,0,-4.6,{yr:.8,pmin:-.15,pmax:.12});
+// 墓地：生垣の茂みの中
+{ for(let i=0;i<9;i++){ const h=new THREE.Mesh(new THREE.DodecahedronGeometry(R(.6,.9),0),M.hedge); h.scale.y=R(.9,1.3); h.position.set(-25+R(-1,1),R(.4,1.1),18+R(-1.1,1.1)); scene.add(h); for(let k=0;k<3;k++) bk('bark').add(new THREE.CylinderGeometry(.01,.02,R(.5,1),3),TM(-25+R(-1.2,1.2),R(.8,1.6),18+R(-1.2,1.2),0,1,1,1,R(-.6,.6),R(-.6,.6))); }
+  collide(-26,-24,17,19,0,2); hideSpot('墓地の茂み','bush',-25,0,18,-PI/2,1.0,-22.8,18,{yr:1.2}); }
+
 /* ============================================================
    各部屋の造作
    ============================================================ */
@@ -807,7 +870,7 @@ GAL.forEach(o=>{ if(rnd()<.45) sheet(o.x,.3,o.z,1.95,.85,GR); });
   for(let i=0;i<4;i++){ const ap=new THREE.Mesh(new THREE.PlaneGeometry(.6,1),std({map:TX.linen,color:'#9a8c70',side:THREE.DoubleSide})); ap.position.set(6.2,2.1,16+i*.8); ap.rotation.y=PI/2; scene.add(ap); }
   for(let i=0;i<12;i++) floorSplat(R(8,16),0,R(20,29),R(.15,.4)).material;
   for(let i=0;i<14;i++){ const d=new THREE.Mesh(new THREE.SphereGeometry(R(.04,.12),8,6),M.waxRaw); d.scale.y=.25; d.position.set(R(8,16),.01,R(19,29)); scene.add(d); }
-  candelabra(15,.9,28.2,1); candelabra(8.4,.9,18.4,1); splat(19.82,1.6,26,-PI/2,.9,0);
+  candelabra(15,.9,28.2,1); candelabra(8.4,.9,18.4,1); splat(19.82,1.6,24.2,-PI/2,.9,0);
   cobweb(19.7,3.7,12.3,-PI/4,1.5); }
 
 // --- 晩餐の間（1F東南）：蝋の客たちの晩餐 ---
@@ -821,9 +884,15 @@ GAL.forEach(o=>{ if(rnd()<.45) sheet(o.x,.3,o.z,1.95,.85,GR); });
   collide(11.4,14.6,-6.2,7.2,0,1.2);
   chair(13,0,7.7,PI,true); tapable(chair(13,0,-6.7,0,true),'空いた上座',['主人の席だろうか。まだ温かい。']);
   rug(13,0,.5,4.6,15.5,0);
-  for(const [x,z,ry,i] of [[19.8,-6,-PI/2,2],[19.8,7,-PI/2,0],[6.2,-2,PI/2,3],[6.2,6,PI/2,1]]) portrait(x,2.3,z,ry,.9,1.2,i);
+  for(const [x,z,ry,i] of [[19.8,-6,-PI/2,2],[19.8,8,-PI/2,0],[13,11.82,PI,3]]) portrait(x,2.3,z,ry,.9,1.2,i);
   shelf(7,0,-9.6,0,1.8,2,(g,add,y,w)=>{ for(let x=-w/2+.15;x<w/2-.1;x+=.22){ const p=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.01,12),M.bone); p.rotation.x=1.3; p.position.set(x,y+.09,-.1); g.add(p); } });
   cobweb(19.7,3.7,-9.7,-PI*.75,1.4); }
+doorFrame('z',-20,10.1,11.9,0,2.6,['勝手口（回廊へ）','勝手口（墓地へ）']);
+doorFrame('z',20,26.1,27.9,0,2.6,['勝手口（裏庭へ）','勝手口（工房へ）']);
+doorFrame('x',-10,13.3,14.9,0,2.5,['勝手口（晩餐の間へ）','勝手口（北の庭へ）']);
+{ const dm=std({map:TX.floorD,color:'#4a3a2a'}); const a=new THREE.Mesh(new THREE.BoxGeometry(.08,2.5,1.75),dm); a.position.set(-20.6,1.25,10.4); a.rotation.y=-.9; a.position.x=-20.75; a.position.z=10.75; scene.add(a);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.08,2.5,1.75),dm); b.position.set(19.4,1.25,27.4); b.rotation.y=.9; scene.add(b);
+  for(const [x,z,w,d] of [[-20.9,11,.7,2.0],[20.9,27,.7,2.0]]){ boxAt('stoneD',x-w/2,x+w/2,-.1,.12,z-d/2,z+d/2); } }
 // 裏口（北の扉）
 { const d=new THREE.Mesh(new THREE.BoxGeometry(1.5,2.45,.08),std({map:TX.floorD,color:'#4a3a2a'})); d.position.set(13.4,1.22,-10.2); d.rotation.y=.9; d.position.x=13.0; d.position.z=-9.6; scene.add(d); }
 
@@ -831,7 +900,7 @@ GAL.forEach(o=>{ if(rnd()<.45) sheet(o.x,.3,o.z,1.95,.85,GR); });
 { const c=new THREE.Mesh(new THREE.PlaneGeometry(7,7),M.circle); c.rotation.x=-PI/2; c.position.set(0,.015,0); scene.add(c);
   // 祭壇
   boxAt('stoneD',-1.4,1.4,0,1.0,-6.8,-5.6); collide(-1.4,1.4,-6.8,-5.6,0,1); const cl=new THREE.Mesh(new THREE.BoxGeometry(2.9,.02,1.3),M.velvet); cl.position.set(0,1.01,-6.2); scene.add(cl);
-  const ve=new THREE.Mesh(new THREE.PlaneGeometry(2.9,.8),std({map:TX.velvet,side:THREE.DoubleSide})); ve.position.set(0,.6,-5.58); scene.add(ve);
+  const ve=new THREE.Mesh(new THREE.PlaneGeometry(2.9,.72),std({map:TX.velvet,side:THREE.DoubleSide})); ve.position.set(0,.64,-5.56); scene.add(ve);
   // 祭壇の上：布をかけた人型
   const sh=sheet(0,1.02,-6.2,.35,.9,GR); sh.rotation.z=PI/2; sh.scale.set(.6,1.6,.6); sh.position.set(-.8,1.15,-6.2);
   { const vh=lyingVictim(GN,-1.25,1.24,-6.2,-PI/2,{scale:.92,name:'祭壇の上の女性',lines:['開かずの一室にいた、あの白い服の女性だ。','足元から、熱い蝋が少しずつかけられていく。','瞼が震えている。……まだ、生きている。','頭巾の者たちの唱える声が、いっそう高くなった。']});
@@ -918,7 +987,7 @@ chandelier(0,7.6,15.6,.5,6); portrait(-5.82,6.2,15.85,PI/2,.8,1.0,2,1); portrait
 { const y=-4;
   for(const x of [8,18.6]) for(let z=-8;z<=12;z+=3.2) shelf(x,y,z,x<10?PI/2:-PI/2,2.8,2.6,(g,add,yy,w)=>{ for(let k=-w/2+.2;k<w/2-.1;k+=.32){ const h=new THREE.Mesh(new THREE.SphereGeometry(.1,12,10),M.waxRaw); h.scale.set(.9,1.15,1); h.position.set(k,yy+.12,0); g.add(h); } });
   for(let i=0;i<9;i++){ const x=10.5+(i%3)*2.2, z=-6+Math.floor(i/3)*5; const s=sheet(x,y+.4,z,1.6,.8); s.userData.dyn=1; bk('iron').add(new THREE.CylinderGeometry(.01,.01,2,4),TM(x,y+3,z)); ANIM.push(t=>{ s.rotation.z=Math.sin(t*.7+i)*.04; }); if(i===4) tapable(s,'吊るされた布の塊',['ゆっくりと揺れている。風は、ない。']); }
-  for(let i=0;i<5;i++){ const cx=R(9,17),cz=R(16,26); boxAt('wood',cx-.5,cx+.5,y,y+.7,cz-.4,cz+.4); collide(cx-.5,cx+.5,cz-.4,cz+.4,y,y+.7); }
+  for(let i=0;i<5;i++){ const cx=R(9,16.4),cz=R(15.5,19.5); boxAt('wood',cx-.5,cx+.5,y,y+.7,cz-.4,cz+.4); collide(cx-.5,cx+.5,cz-.4,cz+.4,y,y+.7); }
   const vat=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,.8,24),M.stoneD); vat.position.set(13,y+.4,22); scene.add(vat); collide(11.6,14.4,20.6,23.4,y,y+.8); const vs=new THREE.Mesh(new THREE.CircleGeometry(1.3,24),M.waxRaw); vs.rotation.x=-PI/2; vs.position.set(13,y+.75,22); scene.add(vs);
   { const hd=new THREE.Mesh(new THREE.SphereGeometry(.11,16,12),waxMat({raw:1})); hd.material.map=faceTex({raw:1,wide:1,scream:1,drip:1}); hd.position.set(13.3,y+.8,21.8); hd.rotation.set(-.6,PI*.8,0); scene.add(hd); const hn=new THREE.Mesh(new THREE.SphereGeometry(.05,8,6),M.waxRaw); hn.scale.set(.8,1.4,.5); hn.position.set(12.4,y+.82,22.4); hn.rotation.z=.4; scene.add(hn); tapable(hd,'蝋の溜め池',['白い蝋の表面から、顔と手が浮かんでいる。','……まだ固まりきっていない。']); }
   for(let i=0;i<10;i++){ const d=new THREE.Mesh(new THREE.ConeGeometry(R(.03,.07),R(.2,.6),6),M.waxRaw); d.rotation.x=PI; d.position.set(R(7,19),-.4,R(-9,26)); scene.add(d); }
@@ -1083,7 +1152,7 @@ const SPOTS=[
   {id:'ido',name:'枯れ井戸',kana:'かれいど',x:30,y:0,z:-28,r:5,lvl:'out',text:'裏庭の枯れ井戸。水はとうに涸れているのに、底から冷たい風が吹きあがる。耳を近づけると、地下の保管庫とつながっているかのような反響がある。',meta:[['見どころ','井戸の底からの声']]},
   {id:'mon',name:'鉄の門',kana:'てつのもん',x:0,y:0,z:47,r:5,lvl:'out',text:'錆びた鉄柵に囲まれた屋敷の正門。門柱の上の石像は、夜になると目が赤く光る。門扉は誰も触れていないのに、いつも半分だけ開いている。',meta:[['見どころ','門柱の石像・荒れた前庭・噴水の像']]},
   {id:'mado',name:'影の映る窓',kana:'かげのうつるまど',x:0,y:0,z:-20,r:6,lvl:'out',text:'屋敷の北側から見上げる、儀式の間の大窓。夜ごと赤い幕の向こうに、頭巾をかぶった者たちの影が揺れる。窓の灯りは、森の奥からでも見えるという。',meta:[['見どころ','窓に映る影絵（あの夜）'],['ひとこと','中に入ると、影の正体が見られる']]},
-  {id:'hall',name:'玄関ホール',kana:'げんかんほーる',x:0,y:0,z:28,r:4,lvl:'1F',text:'二階まで吹き抜けの玄関ホール。燭台のシャンデリア、止まったままの柱時計、深く頭を下げる蝋の執事が客を迎える。正面の大階段は二階の踊り場へ。',meta:[['見どころ','柱時計・蝋の執事・大階段'],['行き先','西＝回廊 / 東＝工房 / 奥＝儀式の間']]},
+  {id:'hall',name:'玄関ホール',kana:'げんかんほーる',x:0,y:0,z:28,r:4,lvl:'1F',text:'二階まで吹き抜けの玄関ホール。燭台のシャンデリア、止まったままの柱時計、深く頭を下げる蝋の執事が客を迎える。正面の大階段は二階の踊り場へ。',meta:[['見どころ','柱時計・蝋の執事・大階段'],['行き先','西＝回廊 / 東＝工房 / 奥＝儀式の間'],['隠れ場所','階段脇の物置']]},
   {id:'kairo',name:'蝋人形の回廊',kana:'ろうにんぎょうのかいろう',x:-13,y:0,z:14,r:5,lvl:'1F',text:'館の主が集めた（作った）蝋人形がずらりと並ぶ長い回廊。祈る者、手を伸ばす者、叫ぶ者。生きたまま時を止められたような生々しさがある。目を離すと、首の向きが変わっている像もある。回廊のいちばん奥には、仕上がったばかりの「今宵の新作」が。',meta:[['見どころ','11体の作品・ガラスの中の3体'],['ひとこと','振り返りながら歩いてみて']]},
   {id:'kobo',name:'蝋の工房',kana:'ろうのこうぼう',x:13,y:0,z:22,r:5,lvl:'1F',text:'大釜で蝋を溶かし、型をとり、人形を仕上げる作業場。作りかけの頭が並び、床には蝋と赤黒い染みが点々と落ちている。奥の階段は地下の保管庫へ続く。',meta:[['見どころ','蝋の大釜・作りかけの頭・地下への階段']]},
   {id:'bansan',name:'晩餐の間',kana:'ばんさんのま',x:13,y:0,z:4,r:5,lvl:'1F',text:'長いテーブルに着いた蝋の客たちの晩餐会。皿は空のまま、グラスの中身は固まっている。上座だけが空いている——主人の席か、それとも次の客の席か。',meta:[['見どころ','8人の蝋の客・空いた上座']]},
@@ -1159,7 +1228,7 @@ function drawMap(){ const L=LVCAN[mapLv]||(LVCAN[mapLv]=drawLevel(mapLv)); const
 $('lvTabs').onclick=e=>{ if(e.target.dataset.k){ mapLv=e.target.dataset.k; drawMap(); } };
 $('spotList').onclick=e=>{ const b=e.target.closest('button'); if(b) warpSpot(+b.dataset.i); };
 $('mini').onclick=openMap; $('mapX').onclick=()=>{ $('map').hidden=true; };
-function warpTo(x,y,z,yaw){ P.x=x; P.z=z; P.y=y; P.vy=0; if(yaw!=null) P.yaw=yaw; P.y=Math.max(surfaceAt(x,z,y+.3),y); }
+function warpTo(x,y,z,yaw){ if(HIDDEN){ HIDDEN=null; document.body.classList.remove('hiding'); $('hideOv').hidden=true; } P.x=x; P.z=z; P.y=y; P.vy=0; if(yaw!=null) P.yaw=yaw; P.y=Math.max(surfaceAt(x,z,y+.3),y); }
 function warpSpot(i){ const s=SPOTS[i]; const off={mori:[0,4],hakaba:[4,0],ido:[-3,3],mon:[0,5],mado:[0,-4],hall:[0,1.5]}[s.id]||[0,0]; warpTo(s.x+off[0],s.y,s.z+off[1],null); warpGuard=s.id; $('map').hidden=true; say('','移動しました。この場所の札は、いったん離れて歩いて訪れると受け取れます。',3.5); }
 // ミニマップ
 const miniC=$('miniC'), mg=miniC.getContext('2d');
@@ -1234,8 +1303,19 @@ const SND=(function(){ let ac=null, master, wind, windG, windF, drone, droneG, o
   S.creak=()=>{ if(!ac||!on) return; const T=ac.currentTime, o=ac.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(70,T); o.frequency.linearRampToValueAtTime(140,T+.6); o.frequency.linearRampToValueAtTime(90,T+1.2); const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=900; bp.Q.value=12; const am=ac.createOscillator(); am.frequency.value=28; const ag=ac.createGain(); ag.gain.value=.12; am.connect(ag); const g=ac.createGain(); g.gain.value=.0; ag.connect(g.gain); g.gain.setValueAtTime(.15,T); g.gain.exponentialRampToValueAtTime(.001,T+1.3); o.connect(bp).connect(g).connect(master); o.start(T); am.start(T); o.stop(T+1.4); am.stop(T+1.4); };
   S.step=(soft)=>{ if(!ac||!on) return; const T=ac.currentTime; const s=ac.createBufferSource(); s.buffer=S.white; const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=soft?350:700; const g=ac.createGain(); g.gain.setValueAtTime(soft?.18:.22,T); g.gain.exponentialRampToValueAtTime(.001,T+(soft?.12:.08)); s.connect(lp).connect(g).connect(master); s.start(T); s.stop(T+.15); };
   S.blip=()=>{};
+  S.heart=()=>{ if(!ac||!on) return; const T=ac.currentTime; for(const [d,v] of [[0,.5],[.22,.35]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(70,T+d); o.frequency.exponentialRampToValueAtTime(40,T+d+.15); const g=ac.createGain(); g.gain.setValueAtTime(0,T+d); g.gain.linearRampToValueAtTime(v,T+d+.02); g.gain.exponentialRampToValueAtTime(.001,T+d+.2); o.connect(g).connect(master); o.start(T+d); o.stop(T+d+.25); } };
   S.owl=()=>{ if(!ac||!on) return; const T=ac.currentTime; for(const [d,f] of [[0,420],[.5,400],[.75,410]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f,T+d); o.frequency.linearRampToValueAtTime(f*.85,T+d+.35); const g=ac.createGain(); g.gain.setValueAtTime(0,T+d); g.gain.linearRampToValueAtTime(.05,T+d+.05); g.gain.exponentialRampToValueAtTime(.001,T+d+.4); o.connect(g).connect(master); o.start(T+d); o.stop(T+d+.45); } };
   return S; })();
+
+/* ============================================================
+   隠れる
+   ============================================================ */
+let HIDDEN=null, nearHide=-1, heartT=0;
+function hideIn(i){ const h=HIDES[i]; HIDDEN={h,back:{x:P.x,y:P.y,z:P.z}}; P.x=h.x; P.z=h.z; P.y=h.y; P.vy=0; P.yaw=h.yaw; P.pitch=h.lie?1.1:0; document.body.classList.add('hiding'); $('hideOv').hidden=false; $('hideName').textContent=h.name; $('hideBtn').hidden=true; ui.card.hidden=true; SND.creak(); }
+function hideOut(){ if(!HIDDEN) return; const h=HIDDEN.h; P.x=h.ex; P.z=h.ez; P.y=Math.max(h.y,surfaceAt(h.ex,h.ez,h.y+.3)); if(blocked(P.x,P.z,P.y)){ P.x=HIDDEN.back.x; P.z=HIDDEN.back.z; P.y=HIDDEN.back.y; } P.pitch=0; HIDDEN=null; document.body.classList.remove('hiding'); $('hideOv').hidden=true; SND.creak(); }
+$('hideBtn').onclick=()=>{ if(nearHide>=0) hideIn(nearHide); };
+$('unhideBtn').onclick=hideOut;
+addEventListener('keydown',e=>{ if(e.code==='KeyE'&&!START){ if(HIDDEN) hideOut(); else if(nearHide>=0) hideIn(nearHide); } });
 
 /* ============================================================
    写真モード
@@ -1254,23 +1334,24 @@ function step(dt,t){
   // 入力
   let mx=IN.mx, mz=IN.mz; const K=IN.keys; if(K.KeyW||K.ArrowUp) mz=-1; if(K.KeyS||K.ArrowDown) mz=1; if(K.KeyA) mx=-1; if(K.KeyD) mx=1; if(K.ArrowLeft) P.yaw+=dt*1.8; if(K.ArrowRight) P.yaw-=dt*1.8;
   P.yaw-=IN.lx*dt*[1.4,2.2,3.2][sens]; P.pitch=Math.max(-1.3,Math.min(1.3,P.pitch-IN.ly*dt*[1,1.6,2.4][sens]));
+  if(HIDDEN){ mx=0; mz=0; const h=HIDDEN.h; let d=((P.yaw-h.yaw+PI)%(2*PI)+2*PI)%(2*PI)-PI; d=Math.max(-h.yr,Math.min(h.yr,d)); P.yaw=h.yaw+d; P.pitch=Math.max(h.pmin,Math.min(h.pmax,P.pitch)); }
   const sp=(IN.run?4.6:2.1)*Math.min(1,Math.hypot(mx,mz)); let moving=false;
   if(sp>.01){ const a=Math.atan2(mx,mz)+P.yaw; const vx=Math.sin(a)*sp*dt, vz=Math.cos(a)*sp*dt; const n=Math.ceil(Math.hypot(vx,vz)/.2);
     for(let i=0;i<n;i++){ const nx=P.x+vx/n, nz=P.z+vz/n;
       const tryMove=(x,z)=>{ if(blocked(x,z,P.y)) return false; const s=surfaceAt(x,z,P.y); if(s<P.y-.62&&s>-1e8&&false) return false; if(s<-1e8) return false; return true; };
       if(tryMove(nx,P.z)){ P.x=nx; moving=true; } if(tryMove(P.x,nz)){ P.z=nz; moving=true; } } }
   P.x=Math.max(MB.x0+2,Math.min(MB.x1-2,P.x)); P.z=Math.max(MB.z0+2,Math.min(MB.z1-2,P.z));
-  const s=surfaceAt(P.x,P.z,P.y); if(s>P.y-.001){ P.y+=Math.min(s-P.y,dt*8+.02); P.vy=0; if(s-P.y<.03) P.y=s; } else { P.vy-=9.8*dt; P.y=Math.max(s,P.y+P.vy*dt); if(P.y===s) P.vy=0; }
+  const s=HIDDEN?P.y:surfaceAt(P.x,P.z,P.y); if(s>P.y-.001){ P.y+=Math.min(s-P.y,dt*8+.02); P.vy=0; if(s-P.y<.03) P.y=s; } else { P.vy-=9.8*dt; P.y=Math.max(s,P.y+P.vy*dt); if(P.y===s) P.vy=0; }
   if(moving){ stepAcc+=dt*(IN.run?2.6:1.7); if(stepAcc>1){ stepAcc=0; SND.step(lvlOf(P.x,P.y,P.z)==='out'); } }
   const bob=moving?Math.sin(t*(IN.run?11:7.5))*.035:0;
-  camera.position.set(P.x,P.y+1.6+bob,P.z); camera.rotation.set(P.pitch,P.yaw,0);
+  camera.position.set(P.x,P.y+(HIDDEN?HIDDEN.h.eye:1.6)+bob,P.z); camera.rotation.set(P.pitch,P.yaw,0);
   // 屋内外
   const lv=lvlOf(P.x,P.y,P.z), indoor=lv!=='out'; const ritual=inR({x0:-6,x1:6,z0:-10,z1:14},P.x,P.z)&&lv==='1F'?1:0;
   const ush=TIME==='ushi';
   const fogT=indoor?.05:(ush?.06:.05)*FOGD; scene.fog.density+=(fogT-scene.fog.density)*Math.min(1,dt*2);
   scene.fog.color.set(indoor?'#0b0809':(ush?'#3a2226':'#2c3340')); renderer.setClearColor(scene.fog.color);
   moonL.intensity+=((indoor?.04:(ush?.4:.6))-moonL.intensity)*Math.min(1,dt*2); hemi.intensity+=((indoor?.32:(ush?.45:.7))-hemi.intensity)*Math.min(1,dt*2);
-  lamp.intensity=LAMP?(2.1+Math.sin(t*13)*.08+Math.sin(t*31)*.05)*(indoor?1:1.1):0;
+  lamp.intensity=(LAMP&&!HIDDEN)?(2.1+Math.sin(t*13)*.08+Math.sin(t*31)*.05)*(indoor?1:1.1):0;
   FOGS.forEach(f=>{ f.s.position.x+=f.vx*dt; f.s.position.z+=f.vz*dt; const d=Math.hypot(f.s.position.x-P.x,f.s.position.z-P.z); const k=Math.min(1,Math.max(0,(d-2.5)/6))*Math.min(1,Math.max(0,(75-d)/30)); f.s.material.opacity=f.o*k*(indoor?.15:1)*FOGD*(TIME==='ushi'?1.15:1); f.s.material.color.set(TIME==='ushi'?'#c8a8a8':'#b8c0cc'); });
   FOGL.forEach((L,i)=>{ L.tt.offset.x+=L.sp*dt; L.tt.offset.y+=L.sp*.6*dt; L.m.visible=!indoor||lv==='1F'&&!inR({x0:-20,x1:20,z0:-10,z1:30},P.x,P.z); L.m.material.opacity=L.o*FOGD; L.m.material.color.set(TIME==='ushi'?'#9a8080':'#8a93a2'); });
   // 炎・光源プール
@@ -1299,6 +1380,10 @@ function step(dt,t){
   // 初めて開かずの一室に入ったとき
   if(!scareDone&&ERA==='night'&&lv==='2F'&&inR({x0:-20,x1:-6,z0:-10,z1:9},P.x,P.z)){ scareDone=true; setTimeout(()=>{ SND.scream(1,0); flash(); say('','——すぐ近くで、叫び声がした。',4); },600); }
   if(!window._hallHint&&lv==='1F'&&inR({x0:-6,x1:6,z0:17,z1:30},P.x,P.z)){ window._hallHint=1; say('玄関ホール','左（西）の扉＝蝋人形の回廊／右（東）＝蝋の工房／階段の奥の両脇＝儀式の間／大階段＝二階。扉の上の札と燭台が目印です。',8); }
+  // 隠れ場所の検出
+  if(!HIDDEN){ let hi=-1,hd=1e9; HIDES.forEach((h,i)=>{ if(Math.abs(h.y-P.y)>1.2) return; const d=Math.hypot(P.x-h.ex,P.z-h.ez); const d2=Math.hypot(P.x-h.x,P.z-h.z); const dd=Math.min(d,d2); if(dd<1.6&&dd<hd){ hd=dd; hi=i; } });
+    if(hi!==nearHide){ nearHide=hi; $('hideBtn').hidden=hi<0; if(hi>=0) $('hideBtn').textContent='隠れる：'+HIDES[hi].name; } }
+  else { heartT-=dt; if(heartT<=0){ heartT=.85; SND.heart(); } }
   // 見どころ・札
   let ns=-1, nd=1e9; SPOTS.forEach((sp,i)=>{ if(sp.lvl!==lv) return; const d=Math.hypot(P.x-sp.x,P.z-sp.z); if(d<sp.r&&d<nd){ nd=d; ns=i; } if(warpGuard===sp.id&&d>sp.r+3) warpGuard=null;
     if(d<sp.r*.8&&!GOT[sp.id]&&warpGuard!==sp.id){ GOT[sp.id]=1; saveGot(); updFuda(); toast(sp.name,'見どころ札を受け取った'); } });
