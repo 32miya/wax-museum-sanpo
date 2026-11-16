@@ -1736,11 +1736,13 @@ function newGame(){ const pl=lobby.map((L,i)=>({id:L.id,n:L.n,role:L.role,ch:L.c
     if(p.ai){ p.mode='wait'; p.goal=null; p.D=null; p.reT=0; p.last=null; p.checks=[]; p.cool=0; } });
   const nRun=Math.max(1,pl.filter(p=>p.role==='run').length); const idx=KEYSPOTS.map((k,i)=>i).sort(()=>Math.random()-.5).slice(0,Math.min(KEYSPOTS.length,nRun+1));
   G={pl,t:SET.min*60,pre:10,over:false,evs:[],keys:idx.map(i=>({i,x:KEYSPOTS[i][0],y:KEYSPOTS[i][1],z:KEYSPOTS[i][2],by:-1}))};
+  // AIの鬼のうち1体は、はじめの90秒だけ森の入口へ向かってくる
+  const hunter=G.pl.find(p=>p.ai); if(hunter){ hunter.mode='hunt'; hunter.huntT=90; const pt=PATH[1+Math.floor(Math.random()*3)]; hunter.goal={x:pt[0],y:0,z:pt[1]}; G.hunter=hunter.n; }
   if(G.pl.some(p=>p.ai)&&!NAV) buildNav();
   return G; }
 function hostEvent(m){ broadcast({t:'ev',m}); onEv(m); }
 function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free'){ me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; me0.rs=rescueTarget(); me0.cr=CROUCH?1:0; } }
-  if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent('鬼が動き出した！'); }
+  if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent(G.hunter?'鬼が動き出した！——「'+G.hunter+'」が森の入口へ向かってくる……':'鬼が動き出した！'); }
   else G.t-=dt;
   // AI鬼
   G.pl.forEach(p=>{ if(p.ai) aiStep(p,dt); });
@@ -1781,6 +1783,7 @@ function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
   if(p.mode==='chase'){ goal=p.last; spd=p.spd*.95; }
   else if(p.mode==='lurk'){ goal=p.last; spd=2.4*OSCALE; p.lurkT-=dt; if(p.lurkT<=0){ p.mode='patrol'; p.goal=null; } }
   else if(p.mode==='search'){ spd=3.4*OSCALE; { goal=p.last; if(!p.last||Math.hypot(p.last.x-p.x,p.last.z-p.z)<1.5){ p.mode='patrol'; p.goal=null; } } }
+  if(p.mode==='hunt'){ p.huntT-=dt; goal=p.goal; spd=3.4*OSCALE; if(p.huntT<=0||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<3){ p.mode='patrol'; p.goal=null; } }
   if(p.mode==='patrol'||p.mode==='wait'){ // 鍵を持つ者を優先して追う
     const kr=G.pl.find(r=>r.role==='run'&&r.st==='free'&&r.key>=0&&!r.away&&r.hid<0&&Math.hypot(r.x-p.x,r.z-p.z)<30); if(kr&&Math.random()<.02){ p.goal={x:kr.x,y:kr.y,z:kr.z}; } p.mode='patrol'; if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5){ const rr=Math.random(); if(rr<.35){ const i=Math.floor(Math.random()*HIDES.length), h=HIDES[i]; p.goal={x:h.ex,y:h.y,z:h.ez}; } else if(rr<.6){ const k=G.keys[Math.floor(Math.random()*G.keys.length)]; p.goal=Math.random()<.5&&k?{x:k.x,y:k.y,z:k.z}:{x:EXIT.x+R(-6,6),y:0,z:EXIT.z+R(4,12)}; } else { const n=NAV.arr[Math.floor(Math.random()*NAV.arr.length)]; p.goal={x:n.x,y:n.y,z:n.z}; } p.reT=0; }
     goal=p.goal; spd=2.4*OSCALE; }
@@ -1788,12 +1791,18 @@ function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
   // 直接見えているなら直進、そうでなければ網をたどる
   let dirx,dirz; const direct=p.mode==='chase'&&tgt;
   if(direct){ dirx=goal.x-p.x; dirz=goal.z-p.z; }
-  else { if(p.reT<=0||!p.D){ p.reT=.7; p.gn=NAV.near(goal.x,goal.y,goal.z); p.D=flow(p.gn); } const cur=NAV.near(p.x,p.y,p.z); if(!cur||!p.D.has(cur)){ dirx=goal.x-p.x; dirz=goal.z-p.z; }
-    else { let best=cur,bd=p.D.get(cur); for(const m of cur.nb){ const d=p.D.get(m); if(d!=null&&d<bd){ bd=d; best=m; } } if(best===cur){ dirx=goal.x-p.x; dirz=goal.z-p.z; } else { // 少し先の点をねらう
-        let nx=best; for(let k=0;k<2;k++){ let b2=nx,d2=p.D.get(nx); for(const m of nx.nb){ const d=p.D.get(m); if(d!=null&&d<d2){ d2=d; b2=m; } } nx=b2; } dirx=nx.x-p.x; dirz=nx.z-p.z; } } }
+  else { if(p.reT<=0||!p.D){ p.reT=.7; p.gn=NAV.near(goal.x,goal.y,goal.z); p.D=flow(p.gn); }
+    // 網の点を一つずつたどる（毎回いちばん近い点を探し直すと行ったり来たりするため）
+    if(!p.tn||!p.D.has(p.tn)||Math.hypot(p.tn.x-p.x,p.tn.z-p.z)>3) p.tn=NAV.near(p.x,p.y,p.z);
+    let guard=0; while(p.tn&&Math.hypot(p.tn.x-p.x,p.tn.z-p.z)<.4&&guard++<4){ let b=p.tn,bd=p.D.get(p.tn); for(const m of p.tn.nb){ const d=p.D.get(m); if(d!=null&&d<bd){ bd=d; b=m; } } if(b===p.tn){ p.tn=null; break; } p.tn=b; }
+    p.nb1=null; if(p.tn){ dirx=p.tn.x-p.x; dirz=p.tn.z-p.z; } else { dirx=goal.x-p.x; dirz=goal.z-p.z; } }
   const L=Math.hypot(dirx,dirz); if(L<.05){ p.mv=0; return; } const step=Math.min(L,spd*dt); const nx=p.x+dirx/L*step, nz=p.z+dirz/L*step;
   const moveTo=(x,z)=>{ if(blocked(x,z,p.y)) return false; const s=surfaceAt(x,z,p.y); if(s<-1e8) return false; p.x=x; p.z=z; p.y=s>p.y?Math.min(s,p.y+dt*8+.05):Math.max(s,p.y-dt*9); return true; };
-  if(!moveTo(nx,nz)){ if(!moveTo(nx,p.z)) moveTo(p.x,nz); }
+  let ok=moveTo(nx,nz)||moveTo(nx,p.z)||moveTo(p.x,nz);
+  if(!ok&&p.nb1){ // 角を曲がりきれないときは、すぐ隣の点へ
+    const ax=p.nb1.x-p.x, az=p.nb1.z-p.z, aL=Math.hypot(ax,az)||1, st2=Math.min(aL,spd*dt); ok=moveTo(p.x+ax/aL*st2,p.z+az/aL*st2)||moveTo(p.nb1.x,p.nb1.z); if(ok){ dirx=ax; dirz=az; } }
+  // 引っかかったら少しずらす
+  p.stk=(p.stk||0)+(ok?-p.stk:dt); if(p.stk>1.2){ p.stk=0; const a=Math.random()*6.28; moveTo(p.x+Math.cos(a)*.4,p.z+Math.sin(a)*.4); p.reT=0; p.tn=null; }
   p.yaw=Math.atan2(-dirx,-dirz); p.mv=1; }
 
 /* ---------- 通信 ---------- */
