@@ -175,7 +175,9 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 #oniHud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:calc(env(safe-area-inset-left,0px) + 16px);z-index:6;pointer-events:none;text-shadow:0 1px 8px #000}
 #oniTime{font-family:var(--f-disp);font-weight:800;font-size:28px;letter-spacing:.05em}#oniTime.pre{color:var(--shu2);font-size:18px}
 #oniCount{font-size:12px;color:var(--mute)}
-#oniGoal{font-size:12px;margin-top:4px;max-width:58vw;line-height:1.5}#oniGoal.key{color:#bcd0ff;font-weight:700}
+#oniGoal{position:fixed;z-index:6;pointer-events:none;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 10px);width:calc(100vw - 250px);box-sizing:border-box;padding:6px 10px;border-radius:10px;background:rgba(14,11,13,.62);border:1px solid var(--line);font-size:12px;line-height:1.5;text-align:center;overflow-wrap:anywhere;word-break:normal;line-break:strict;text-shadow:0 1px 6px #000}
+#oniGoal:empty{display:none}#oniGoal.key{color:#bcd0ff;font-weight:700;border-color:rgba(150,180,255,.6)}
+@media (max-height:520px){ #oniGoal{width:calc(100vw - 520px);min-width:240px;max-width:520px} }
 #oniCrouch{position:fixed;z-index:6;left:calc(env(safe-area-inset-left,0px) + 120px);bottom:calc(env(safe-area-inset-bottom,0px) + 182px);width:70px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:700;font-size:12px;cursor:pointer}
 #oniCrouch.on{background:#2a3a5a;border-color:#9ab4ff}
 body:not(.touchui) #oniCrouch{left:calc(env(safe-area-inset-left,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
@@ -191,13 +193,13 @@ body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
 #oniRed.chase{opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 30%,rgba(200,0,16,.85) 100%);animation:alr .7s ease-in-out infinite}
 #oniRed.search{opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(230,180,20,.6) 100%);animation:aly 1.6s ease-in-out infinite}
 @keyframes alr{0%,100%{opacity:.75}50%{opacity:1}} @keyframes aly{0%,100%{opacity:.55}50%{opacity:.9}}
-#oniAlert{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);z-index:6;pointer-events:none;font-family:var(--f-disp);font-weight:800;font-size:20px;letter-spacing:.08em;text-shadow:0 2px 10px #000}
+#oniAlert{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 96px);white-space:nowrap;z-index:6;pointer-events:none;font-family:var(--f-disp);font-weight:800;font-size:20px;letter-spacing:.08em;text-shadow:0 2px 10px #000}
 #oniAlert.chase{color:#ff4a4a}#oniAlert.search{color:#ffd040;font-size:16px}
 #oniDrop{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.8);padding:16px}#oniDrop .box{max-width:380px;display:grid;gap:10px;text-align:center}#oniDrop b{font-family:var(--f-disp);font-size:22px}#oniDrop p{margin:0;font-size:14px;line-height:1.7}
 #oniEnd{position:fixed;inset:0;z-index:36;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.86);padding:16px}
 #oniEnd .box{width:100%;max-width:420px;display:grid;gap:10px}#oniEnd .k{font-size:12px;letter-spacing:.2em;color:var(--mute)}#oniEnd h2{margin:0;font-family:var(--f-disp);font-size:38px;color:var(--shu2)}#oniEnd p{margin:0;line-height:1.8;font-size:14px}
 body.ingame .place,body.ingame #spotsBtn,body.ingame #poi{display:none!important}
-@media (max-height:520px){ .topbtns{top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 132px)} #menu{top:calc(env(safe-area-inset-top,0px) + 54px);right:calc(env(safe-area-inset-right,0px) + 132px)} #oniGoal{max-width:40vw} #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:48vw;font-size:12px} }
+@media (max-height:520px){ #oniAlert{top:calc(env(safe-area-inset-top,0px) + 84px)} .topbtns{top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 132px)} #menu{top:calc(env(safe-area-inset-top,0px) + 54px);right:calc(env(safe-area-inset-right,0px) + 132px)} #oniGoal{max-width:40vw} #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:48vw;font-size:12px} }
 #oniSpec{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:7;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:rgba(14,11,13,.85);border:1px solid rgba(150,180,255,.5)}
 #oniSpec div{text-align:center;min-width:150px}#oniSpec small{display:block;font-size:10px;letter-spacing:.2em;color:#bcd0ff}#oniSpec b{font-family:var(--f-disp);font-size:16px}
 #oniSpec button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:#1a1416;color:var(--ink);font-size:16px;cursor:pointer}
@@ -299,7 +301,8 @@ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 
 <div id="oniRed"></div><div id="oniAlert"></div>
 <section id="oniL" hidden><div class="in"><h1>霧ノ森の<em>鬼ごっこ</em></h1><div class="sub">蝋人形館 · オンライン</div><div id="oniLbody"></div></div></section>
-<div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniGoal"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
+<div id="oniGoal" hidden></div>
+<div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
 <div id="oniWax" hidden><b>蝋人形にされた……</b><span>仲間にふれてもらうと動けるようになる</span><div class="bar"><i id="oniWaxBar"></i></div></div>
 <section id="oniEnd" hidden></section>
 <button id="oniCrouch" hidden>しゃがむ</button>
@@ -1926,7 +1929,7 @@ function hostStart(){ if(net.solo&&me.role==='oni'){ me.role='run'; } newGame();
 
 /* ---------- 試合の開始・終了 ---------- */
 let myRole='run', ROSTER=[], myMoving=false, wasWax=false, evT=0;
-function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').hidden=true; el('oniEnd').hidden=true; el('oniHud').hidden=false; prevStop();
+function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').hidden=true; el('oniEnd').hidden=true; el('oniHud').hidden=false; el('oniGoal').hidden=false; prevStop();
   const mine=pl.find(p=>p.id===net.myId); myRole=mine?mine.role:'run';
   GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
@@ -1936,7 +1939,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
 function onEv(m){ say('',m,4.5); }
-function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; { const RED=el('oniRed'); RED.className=''; RED._al=-1; el('oniAlert').textContent=''; el('oniAlert').className=''; } el('oniCrouch').hidden=true; el('oniRescue').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
+function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; { const RED=el('oniRed'); RED.className=''; RED._al=-1; el('oniAlert').textContent=''; el('oniAlert').className=''; } el('oniCrouch').hidden=true; el('oniRescue').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniGoal').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
   const iWin=(r.win==='oni')===(myRole==='oni'); const surv=r.pl.filter(p=>p.role==='run'&&p.st==='esc').map(p=>p.n);
   E.innerHTML=`<div class="box"><div class="k">${r.win==='oni'?'鬼の勝ち':'脱出成功'}</div><h2>${iWin?'勝利':'敗北'}</h2><p>${r.win==='oni'?'森の出口にたどり着いた者はいなかった。迷い人たちは蝋人形にされ、回廊に新しい作品が並んだ……':'銀の鍵を手に、'+esc(surv.join('、'))+' は森の出口から霧ノ森を逃げのびた。'}</p>
    <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='esc'?'脱出':p.st==='wax'?'蝋人形':'森の中'):''}</small></li>`).join('')}</ul>
