@@ -190,6 +190,12 @@ body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
 #oniEnd .box{width:100%;max-width:420px;display:grid;gap:10px}#oniEnd .k{font-size:12px;letter-spacing:.2em;color:var(--mute)}#oniEnd h2{margin:0;font-family:var(--f-disp);font-size:38px;color:var(--shu2)}#oniEnd p{margin:0;line-height:1.8;font-size:14px}
 body.ingame .place,body.ingame #spotsBtn,body.ingame #poi{display:none!important}
 @media (max-height:520px){ .topbtns{top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 132px)} #menu{top:calc(env(safe-area-inset-top,0px) + 54px);right:calc(env(safe-area-inset-right,0px) + 132px)} #oniGoal{max-width:40vw} #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:48vw;font-size:12px} }
+#oniSpec{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:7;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:rgba(14,11,13,.85);border:1px solid rgba(150,180,255,.5)}
+#oniSpec div{text-align:center;min-width:150px}#oniSpec small{display:block;font-size:10px;letter-spacing:.2em;color:#bcd0ff}#oniSpec b{font-family:var(--f-disp);font-size:16px}
+#oniSpec button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:#1a1416;color:var(--ink);font-size:16px;cursor:pointer}
+body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
+@media (max-height:520px){ #oniSpec,body.touchui #oniSpec{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 10px)} }
+@media (min-height:521px){ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 180px)} }
 </style>
 </head>
 <body>
@@ -290,6 +296,7 @@ body.ingame .place,body.ingame #spotsBtn,body.ingame #poi{display:none!important
 <section id="oniEnd" hidden></section>
 <button id="oniRescue" hidden><b>長押しで助ける</b><span><i></i></span></button>
 <section id="oniDrop" hidden></section>
+<div id="oniSpec" hidden><button id="oniSpecL" aria-label="前の仲間">◀</button><div><small>観戦中</small><b id="oniSpecN"></b></div><button id="oniSpecR" aria-label="次の仲間">▶</button></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
@@ -1898,7 +1905,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
 function onEv(m){ say('',m,4.5); }
-function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
+function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
   const iWin=(r.win==='oni')===(myRole==='oni'); const surv=r.pl.filter(p=>p.role==='run'&&p.st==='esc').map(p=>p.n);
   E.innerHTML=`<div class="box"><div class="k">${r.win==='oni'?'鬼の勝ち':'脱出成功'}</div><h2>${iWin?'勝利':'敗北'}</h2><p>${r.win==='oni'?'森の出口にたどり着いた者はいなかった。迷い人たちは蝋人形にされ、回廊に新しい作品が並んだ……':'銀の鍵を手に、'+esc(surv.join('、'))+' は森の出口から霧ノ森を逃げのびた。'}</p>
    <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='esc'?'脱出':p.st==='wax'?'蝋人形':'森の中'):''}</small></li>`).join('')}</ul>
@@ -1938,7 +1945,13 @@ LOCKMOVE=()=>{ if(!GAMEMODE) return false; if(V&&V.pre>0&&myRole==='oni') return
 WALKSPD=()=>GAMEMODE&&myRole==='oni'?2.1*OSCALE:2.1;
 RUNSPD=()=>{ if(!GAMEMODE) return 4.6; if(myRole==='oni'){ const m=ROSTER.find(p=>p.id===net.myId); return OSPD[m?m.ch:0]; } return stamina>0?4.6:2.6; };
 let stamina=6, camD=3.4;
+/* ---------- 観戦（脱出した後、まだ逃げている仲間の視点で見る） ---------- */
+let SPEC={on:false,id:-1,off:0,lastYaw:0};
+function specList(){ if(!V) return []; return V.pl.filter(q=>{ const r=ROSTER.find(p=>p.id===q[0]); return r&&r.role==='run'&&q[0]!==net.myId&&!q[11]&&!q[9]; }).sort((a,b)=>(a[7]-b[7])||(a[0]-b[0])); }
+function specSwitch(d){ const L=specList(); if(!L.length){ SPEC.id=-1; return; } let i=L.findIndex(q=>q[0]===SPEC.id); i=i<0?0:(i+d+L.length)%L.length; SPEC.id=L[i][0]; SPEC.off=0; P.pitch=0; }
+el('oniSpecL').onclick=()=>specSwitch(-1); el('oniSpecR').onclick=()=>specSwitch(1);
 GAMECAM=(bob,moving,dt)=>{ if(!GAMEMODE){ camera.position.set(P.x,P.y+1.6+bob,P.z); camera.rotation.set(P.pitch,P.yaw,0); return; }
+  if(SPEC.on&&SPEC.hid>=0){ const h=HIDES[SPEC.hid]; camera.position.set(h.x,h.y+h.eye,h.z); camera.rotation.set(h.lie?1.1:Math.max(h.pmin,Math.min(h.pmax,P.pitch)),h.yaw+Math.max(-h.yr,Math.min(h.yr,SPEC.off)),0); return; }
   const head=V3(P.x,P.y+1.55,P.z), fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw); const pit=Math.max(-.9,Math.min(.6,P.pitch)); const elev=.32-pit*.75, want=3.4;
   const dir=V3(-fx*Math.cos(elev),Math.sin(elev),-fz*Math.cos(elev));
   let d=.3; for(;d<want;d+=.12){ const x=head.x+dir.x*d,y=head.y+dir.y*d,z=head.z+dir.z*d; if(pointBlocked(x,y,z)||slabBetween(x,z,head.y,y+.25)) break; }
@@ -1956,9 +1969,9 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   // 他の人
   const k=Math.min(1,dt*10);
   V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res,away,hasKey,esc]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
-    const R0=ROSTER.find(p=>p.id===id); if(!R0) return; const A=avFor(R0);
+    const R0=ROSTER.find(p=>p.id===id); if(!R0) return; const A=avFor(R0); if(!(A.x===A.x)||A.x==null){ A.x=x; A.y=y; A.z=z; A.yaw=yaw; }
     A.x+=(x-A.x)*k; A.y+=(y-A.y)*k; A.z+=(z-A.z)*k; let dy=yaw-A.yaw; dy=((dy+PI)%(2*PI)+2*PI)%(2*PI)-PI; A.yaw+=dy*k;
-    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0&&!esc; A.tag.material.opacity=away?.35:1; if(A.keyM) A.keyM.visible=!!hasKey; A.av.o.update(t+id,!!mv&&!wax);
+    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0&&!esc; A.tag.visible=!(SPEC.on&&SPEC.id===id); A.tag.material.opacity=away?.35:1; if(A.keyM) A.keyM.visible=!!hasKey; A.av.o.update(t+id,!!mv&&!wax);
     if(A.wax!==!!wax){ A.wax=!!wax; waxify(A.av.g,A.wax); } });
   // 銀の鍵
   if(V.k){ while(KEYV.length<V.k.length){ const m=keyMesh(); scene.add(m); KEYV.push(m); } KEYV.forEach((m,i)=>{ const k=V.k[i]; m.visible=!!k&&k[3]<0; if(k){ m.position.set(k[0],k[1]+.9+Math.sin(t*2+i)*.1,k[2]); m.rotation.y=t*1.5; } }); }
@@ -1971,8 +1984,16 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   el('oniCount').textContent=`逃げている ${free} / ${runs}`;
   const mine=V.pl.find(q=>q[0]===net.myId); const iamWax=mine&&mine[7];
   const iEsc=mine&&mine[11], iKey=mine&&mine[10];
-  if(iEsc&&!window._escShown){ window._escShown=1; say('脱出','銀の鍵で森の出口を開けた！ あとは仲間を待とう',6); SND.chime(); }
-  el('oniGoal').textContent=myRole==='oni'?'迷い人を全員捕まえろ。鍵を持つ者を出口へ行かせるな':iEsc?'脱出成功！ 仲間を待っています':iamWax?'':iKey?'銀の鍵を持っている！ 北の「森の出口」へ':'館のどこかにある「銀の鍵」を探せ（地図に◆）';
+  // 観戦：脱出したら、まだ森にいる仲間の後ろから見る
+  if(iEsc){ if(!SPEC.on){ SPEC.on=true; SPEC.id=-1; SPEC.lastYaw=P.yaw; }
+    let L=specList(); if(!L.find(q=>q[0]===SPEC.id)) specSwitch(0); const tq=V.pl.find(q=>q[0]===SPEC.id), TA=AV.get(SPEC.id);
+    if(tq&&TA){ SPEC.off+=P.yaw-SPEC.lastYaw; SPEC.off=((SPEC.off+PI)%(2*PI)+2*PI)%(2*PI)-PI; P.x=TA.x; P.y=TA.y; P.z=TA.z; P.yaw=TA.yaw+SPEC.off; SPEC.lastYaw=P.yaw; SPEC.hid=tq[6];
+      const R0=ROSTER.find(p=>p.id===SPEC.id); el('oniSpecN').textContent=(R0?R0.n:'')+(tq[7]?'（蝋人形）':tq[6]>=0?'（隠れている）':tq[10]?'（鍵を持っている）':'');
+      el('oniSpec').hidden=false; el('oniSpecL').hidden=el('oniSpecR').hidden=L.length<2; }
+    else { el('oniSpec').hidden=false; el('oniSpecN').textContent='見られる仲間がいません'; el('oniSpecL').hidden=el('oniSpecR').hidden=true; SPEC.hid=-1; } }
+  else { SPEC.on=false; SPEC.hid=-1; el('oniSpec').hidden=true; }
+  if(iEsc&&!window._escShown){ window._escShown=1; say('脱出','銀の鍵で森の出口を開けた！ ここからは、まだ逃げている仲間の視点で見守れます（◀ ▶で切り替え）',6); SND.chime(); }
+  el('oniGoal').textContent=myRole==='oni'?'迷い人を全員捕まえろ。鍵を持つ者を出口へ行かせるな':iEsc?'脱出成功！ 仲間の様子を観戦中':iamWax?'':iKey?'銀の鍵を持っている！ 北の「森の出口」へ':'館のどこかにある「銀の鍵」を探せ（地図に◆）';
   el('oniGoal').classList.toggle('key',!!iKey);
   const wN=nearWax(); const rb=el('oniRescue'); rb.hidden=!wN||!!iamWax||!!iEsc; if(wN){ const R0=ROSTER.find(p=>p.id===wN[0]); rb.querySelector('b').textContent='長押しで助ける：'+(R0?R0.n:''); rb.querySelector('i').style.width=Math.min(100,(wN[8]||0)/3*100)+'%'; }
   if(meA){ if(!meA.keyM){ meA.keyM=keyMesh(); meA.keyM.scale.setScalar(.7); meA.keyM.position.set(.3,1.0,-.15); meA.av.g.add(meA.keyM); } meA.keyM.visible=!!iKey; meA.av.g.visible=!HIDDEN&&!iEsc; }
