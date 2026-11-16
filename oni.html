@@ -187,7 +187,12 @@ body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
 #oniWax{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:6;text-align:center;font-family:var(--f-disp);text-shadow:0 2px 12px #000;pointer-events:none}
 #oniWax b{display:block;font-size:24px;color:#f0e6d2}#oniWax span{font-size:13px}
 #oniWax .bar{margin:8px auto 0;width:160px}#oniWax .bar i{background:var(--shu2)}
-#oniRed{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 35%,rgba(150,0,10,.9) 100%);transition:opacity .3s}
+#oniRed{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .35s}
+#oniRed.chase{opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 30%,rgba(200,0,16,.85) 100%);animation:alr .7s ease-in-out infinite}
+#oniRed.search{opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(230,180,20,.6) 100%);animation:aly 1.6s ease-in-out infinite}
+@keyframes alr{0%,100%{opacity:.75}50%{opacity:1}} @keyframes aly{0%,100%{opacity:.55}50%{opacity:.9}}
+#oniAlert{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);z-index:6;pointer-events:none;font-family:var(--f-disp);font-weight:800;font-size:20px;letter-spacing:.08em;text-shadow:0 2px 10px #000}
+#oniAlert.chase{color:#ff4a4a}#oniAlert.search{color:#ffd040;font-size:16px}
 #oniDrop{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.8);padding:16px}#oniDrop .box{max-width:380px;display:grid;gap:10px;text-align:center}#oniDrop b{font-family:var(--f-disp);font-size:22px}#oniDrop p{margin:0;font-size:14px;line-height:1.7}
 #oniEnd{position:fixed;inset:0;z-index:36;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.86);padding:16px}
 #oniEnd .box{width:100%;max-width:420px;display:grid;gap:10px}#oniEnd .k{font-size:12px;letter-spacing:.2em;color:var(--mute)}#oniEnd h2{margin:0;font-family:var(--f-disp);font-size:38px;color:var(--shu2)}#oniEnd p{margin:0;line-height:1.8;font-size:14px}
@@ -292,7 +297,7 @@ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 </section>
 <div id="err" hidden>この端末では3D表示を開始できませんでした。<br>WebGLに対応したブラウザで開いてください。</div>
 
-<div id="oniRed"></div>
+<div id="oniRed"></div><div id="oniAlert"></div>
 <section id="oniL" hidden><div class="in"><h1>霧ノ森の<em>鬼ごっこ</em></h1><div class="sub">蝋人形館 · オンライン</div><div id="oniLbody"></div></div></section>
 <div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniGoal"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
 <div id="oniWax" hidden><b>蝋人形にされた……</b><span>仲間にふれてもらうと動けるようになる</span><div class="bar"><i id="oniWaxBar"></i></div></div>
@@ -1746,6 +1751,12 @@ function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.
     // 仲間を助ける：蝋になった仲間のそばで3秒長押し。手を離すと0から
     for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<1.6&&Math.abs(r.y-w.y)<1.2);
       if(h){ w.res+=dt; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else w.res=0; }
+    // 見つかっているか（2＝追われている／1＝近くで探されている）
+    for(const r of run){ let al=0; if(r.st==='free'&&!r.away){ for(const o of oni){ const d=Math.hypot(o.x-r.x,o.z-r.z), dy=Math.abs(o.y-r.y);
+          if(r.hid<0){ if(o.ai){ if(o.mode==='chase'&&o.tid===r.id) al=2; else if((o.mode==='search'||o.mode==='lurk')&&o.last&&Math.hypot(o.last.x-r.x,o.last.z-r.z)<10&&dy<2) al=Math.max(al,1); else if(d<9&&dy<2) al=Math.max(al,1); }
+            else { const fx=-Math.sin(o.yaw),fz=-Math.cos(o.yaw), dot=d>.01?((r.x-o.x)*fx+(r.z-o.z)*fz)/d:1; if(d<17&&dot>.35&&sees(o,r)) al=2; else if(d<10&&dy<2) al=Math.max(al,1); } }
+          else { if((o.ai&&o.mode==='lurk'&&o.last&&Math.hypot(o.last.x-r.x,o.last.z-r.z)<4)||(d<6&&dy<2)) al=Math.max(al,1); } if(al===2) break; } }
+      if(al===2) r.alT=1.5; else if(r.alT>0&&r.hid<0){ r.alT-=dt; al=2; } else r.alT=0; r.al=al; }
     // 銀の鍵を拾う（ふれるだけ）
     for(const k of G.keys){ if(k.by>=0) continue; const r=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.key<0&&Math.hypot(r.x-k.x,r.z-k.z)<1.1&&Math.abs(r.y-k.y)<1.3); if(r){ k.by=r.id; r.key=G.keys.indexOf(k); hostEvent(r.n+' が「'+KEYSPOTS[k.i][3]+'」で銀の鍵を手に入れた！'); } }
     // 鍵を持って森の出口へ
@@ -1864,7 +1875,7 @@ function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
   else if(m.t==='end'){ onEnd(m); }
   else if(m.t==='back'){ ended=false; inGame=false; el('oniEnd').hidden=true; teardown(); GAMEMODE=false; START=true; showLobby(); }
   else if(m.t==='bye'){ leaving=true; dropUI(0); try{ localStorage.removeItem('oni_last'); }catch(e){} lobbyMsg('主が部屋を閉じました'); } }
-function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0,p.key>=0?1:0,p.st==='esc'?1:0,p.cr?1:0]),k:G.keys.map(k=>[k.x,k.y,k.z,k.by])}; }
+function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0,p.key>=0?1:0,p.st==='esc'?1:0,p.cr?1:0,p.al||0]),k:G.keys.map(k=>[k.x,k.y,k.z,k.by])}; }
 
 /* ---------- 画面（タイトル・控え室） ---------- */
 function lobbyMsg(s){ const L=el('oniL'); L.hidden=false; el('oniLbody').innerHTML=`<p class="lmsg">${esc(s)}</p><button class="o2" id="oniBack">タイトルへ</button>`; el('oniBack').onclick=()=>location.reload(); }
@@ -1915,7 +1926,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
 function onEv(m){ say('',m,4.5); }
-function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
+function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; { const RED=el('oniRed'); RED.className=''; RED._al=-1; el('oniAlert').textContent=''; el('oniAlert').className=''; } el('oniCrouch').hidden=true; el('oniRescue').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
   const iWin=(r.win==='oni')===(myRole==='oni'); const surv=r.pl.filter(p=>p.role==='run'&&p.st==='esc').map(p=>p.n);
   E.innerHTML=`<div class="box"><div class="k">${r.win==='oni'?'鬼の勝ち':'脱出成功'}</div><h2>${iWin?'勝利':'敗北'}</h2><p>${r.win==='oni'?'森の出口にたどり着いた者はいなかった。迷い人たちは蝋人形にされ、回廊に新しい作品が並んだ……':'銀の鍵を手に、'+esc(surv.join('、'))+' は森の出口から霧ノ森を逃げのびた。'}</p>
    <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='esc'?'脱出':p.st==='wax'?'蝋人形':'森の中'):''}</small></li>`).join('')}</ul>
@@ -2045,9 +2056,10 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   const hb=$('hideBtn'); if(myRole==='oni'){ hb.hidden=true; }
   else if(iamWax||iEsc) hb.hidden=true;
   else if(nearHide>=0){ hb.disabled=false; const taken=V.pl.some(q=>q[0]!==net.myId&&q[6]===nearHide); hb.hidden=false; hb.textContent=taken?'（だれかが隠れている）':'隠れる：'+HIDES[nearHide].name; hb.disabled=taken; }
-  // 鬼が近いときの鼓動・画面の赤み
-  if(myRole==='run'){ let dmin=99; V.pl.forEach(q=>{ const r=ROSTER.find(p=>p.id===q[0]); if(r&&r.role==='oni') dmin=Math.min(dmin,Math.hypot(q[1]-P.x,q[3]-P.z)+Math.abs(q[2]-P.y)*2); }); el('oniRed').style.opacity=Math.max(0,Math.min(.45,(9-dmin)/9*.45)); evT-=dt; if(dmin<9&&evT<=0&&!HIDDEN){ evT=Math.max(.35,dmin/10); SND.heart(); } }
-  else el('oniRed').style.opacity=0; };
+  // 見つかった合図：追われている＝赤、近くで探されている＝黄
+  const al=(myRole==='run'&&mine&&!iamWax&&!iEsc)?(mine[13]||0):0; const RED=el('oniRed');
+  if(al!==RED._al){ RED._al=al; RED.className=al===2?'chase':al===1?'search':''; el('oniAlert').textContent=al===2?'見つかった！ 逃げろ':al===1?'近くで探している……':''; el('oniAlert').className=RED.className; }
+  if(al){ evT-=dt; if(evT<=0){ evT=al===2?.38:.75; SND.heart(); } } };
 // 隠れる／調べる
 $('hideBtn').onclick=()=>{ if(!GAMEMODE){ if(nearHide>=0) hideIn(nearHide); return; } if(nearHide<0) return;
   if(myRole==='oni') return;
