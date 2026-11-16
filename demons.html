@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0a0c">
+<title>霧ノ森 蝋人形館 — 鬼役の悪魔六体</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+:root{--ink:#efe9e4;--mute:#a79c98;--shu:#a3121b;--shu2:#e0313b;--line:rgba(239,233,228,.14);--panel:rgba(14,11,13,.82);--fd:"Shippori Mincho","Hiragino Mincho ProN",serif;--fb:"Zen Kaku Gothic New","Hiragino Sans",sans-serif;color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#07060a;color:var(--ink);font-family:var(--fb)}
+body{touch-action:none;-webkit-user-select:none;user-select:none}
+#c{position:fixed;inset:0}
+header{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:16px;right:16px;pointer-events:none;text-shadow:0 1px 10px #000}
+header small{font-size:11px;letter-spacing:.2em;color:var(--mute)}
+header h1{margin:2px 0 0;font-family:var(--fd);font-weight:800;font-size:22px;letter-spacing:.06em}
+#card{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 70px);max-width:440px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#card .k{font-size:11px;letter-spacing:.2em;color:var(--mute)}
+#card h2{margin:2px 0 6px;font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:.06em}
+#card h2 span{font-size:13px;color:var(--shu2);margin-left:8px;letter-spacing:.1em}
+#card p{margin:0 0 8px;font-size:13px;line-height:1.75}
+#card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:12px;border-top:1px solid var(--line);padding-top:8px}
+#card dt{color:var(--mute)}#card dd{margin:0}
+nav{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;justify-content:center;gap:8px}
+nav button{height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 13px var(--fb);cursor:pointer}
+nav button.on{background:rgba(163,18,27,.8);border-color:transparent}
+#hint{position:fixed;top:calc(env(safe-area-inset-top,0px) + 64px);left:16px;font-size:11px;color:var(--mute);pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header><small>霧ノ森 蝋人形館 · 鬼ごっこ</small><h1>鬼役の悪魔 六体</h1></header>
+<div id="hint">ドラッグで回す · 悪魔をタップで選ぶ</div>
+<section id="card"><div class="k" id="kk"></div><h2 id="nm"></h2><p id="tx"></p><dl id="dl"></dl></section>
+<nav><button id="prev">◀</button><button id="all">全員</button><button id="walk">歩かせる</button><button id="next">▶</button></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+const PI=Math.PI, V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+const cv=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75)); renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.25;
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene(); scene.fog=new THREE.FogExp2('#120e14',.045); renderer.setClearColor('#0a080c');
+const camera=new THREE.PerspectiveCamera(innerWidth<innerHeight?62:42,innerWidth/innerHeight,.05,200);
+scene.add(new THREE.HemisphereLight('#5a6080','#140c0c',.55));
+const key=new THREE.SpotLight('#ffd0a0',2.2,40,.6,.6,1.2); key.position.set(4,9,8); key.castShadow=true; key.shadow.mapSize.set(1024,1024); scene.add(key); scene.add(key.target);
+const rim=new THREE.DirectionalLight('#7088ff',.7); rim.position.set(-6,5,-8); scene.add(rim);
+const fill=new THREE.PointLight('#ff4020',.8,14,2); fill.position.set(0,.6,3); scene.add(fill);
+
+let seed=7; const rnd=()=>((seed=seed*16807%2147483647)-1)/2147483646, R=(a,b)=>a+(b-a)*rnd();
+function cnv(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+function tex(c){ const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t; }
+// 平面陰影のポリゴン材質
+const P=(col,o)=>new THREE.MeshStandardMaterial(Object.assign({color:col,flatShading:true,roughness:.75},o||{}));
+const glow=(col,i)=>new THREE.MeshStandardMaterial({color:'#000',emissive:col,emissiveIntensity:i||2.2,flatShading:true});
+function lathe(pts,seg){ return new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),seg||10); }
+function mesh(g,m,x,y,z,rx,ry,rz,sx,sy,sz){ const o=new THREE.Mesh(g,m); o.position.set(x||0,y||0,z||0); o.rotation.set(rx||0,ry||0,rz||0); if(sx) o.scale.set(sx,sy==null?sx:sy,sz==null?sx:sz); o.castShadow=true; return o; }
+function jitter(g,a){ const p=g.attributes.position; for(let i=0;i<p.count;i++){ p.setXYZ(i,p.getX(i)+R(-a,a),p.getY(i)+R(-a,a)*.6,p.getZ(i)+R(-a,a)); } g.computeVertexNormals(); return g; }
+function limb(len,r0,r1,m,seg){ const g=new THREE.CylinderGeometry(r1,r0,len,seg||6); g.translate(0,-len/2,0); return new THREE.Mesh(g,m); }
+const glowTex=(()=>{ const c=cnv(64,64),g=c.getContext('2d'),gr=g.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.3,'rgba(255,255,255,.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,64,64); return tex(c); })();
+function sprite(col,s,op){ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:col,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,opacity:op==null?1:op})); m.scale.set(s,s,1); return m; }
+function flameSprite(){ const c=cnv(64,128),g=c.getContext('2d'),gr=g.createRadialGradient(32,90,2,32,78,60); gr.addColorStop(0,'rgba(255,250,220,1)'); gr.addColorStop(.3,'rgba(255,180,70,.9)'); gr.addColorStop(.7,'rgba(220,70,20,.4)'); gr.addColorStop(1,'rgba(100,10,0,0)'); g.fillStyle=gr; g.beginPath(); g.moveTo(32,4); g.bezierCurveTo(62,64,56,124,32,124); g.bezierCurveTo(8,124,2,64,32,4); g.fill();
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex(c),blending:THREE.AdditiveBlending,transparent:true,depthWrite:false})); return s; }
+// 二足の脚（歩行アニメ用の関節つき）
+function legs(m,len,r,foot,footM,dx){ const L=[]; for(const s of [-1,1]){ const hip=new THREE.Group(); hip.position.set(s*(dx||.14),len*2,0); const th=limb(len,r,r*.8,m); hip.add(th); const knee=new THREE.Group(); knee.position.y=-len; hip.add(knee); knee.add(limb(len,r*.8,r*.6,m)); const f=mesh(new THREE.BoxGeometry(foot[0],foot[1],foot[2]),footM||m,0,-len,foot[2]*.3); knee.add(f); L.push({hip,knee}); } return L; }
+function walkLegs(L,t,amp){ L.forEach((l,i)=>{ const p=t+(i?PI:0); l.hip.rotation.x=Math.sin(p)*amp; l.knee.rotation.x=Math.max(0,-Math.sin(p))*amp*1.3; }); }
+
+/* ============================================================
+   六体の悪魔（オリジナル）
+   ============================================================ */
+const DEMONS=[];
+
+// 一、溶蝋（ようろう）— 頭が燃える蝋燭の、溶けかけた蝋の巨人
+DEMONS.push({id:'yoro',name:'溶蝋',kana:'ようろう',tag:'蝋燭の悪魔',
+ text:'工房の大釜から生まれた、蝋そのものの悪魔。頭のてっぺんで芯が燃え、歩くたびに体から熱い蝋が滴り落ちる。顔は溶けて崩れ、空いた二つの穴だけがこちらを見ている。',
+ stats:[['足の速さ','ふつう'],['鬼としての力','頭の炎で照らした範囲の隠れ場所を見破る'],['弱点','風の通る場所（窓辺・勝手口）では炎が揺れて見えにくい'],['足跡','床に白い蝋の滴が残る']],
+ build(){ const g=new THREE.Group(), wax=P('#ece2cc',{roughness:.35,emissive:'#3a2010',emissiveIntensity:.25}), waxD=P('#d8caa8',{roughness:.4});
+  const L=legs(wax,.55,.13,[.24,.12,.36],waxD,.16); L.forEach(l=>g.add(l.hip));
+  const body=mesh(jitter(lathe([[0,1.05],[.28,1.08],[.36,1.3],[.32,1.6],[.38,1.85],[.33,2.0],[.2,2.08],[0,2.1]],9),.025),wax); g.add(body);
+  // 頭＝太い蝋燭
+  const head=new THREE.Group(); head.position.y=2.08; g.add(head);
+  head.add(mesh(jitter(new THREE.CylinderGeometry(.2,.22,.6,9,3),.02),wax,0,.3,0));
+  head.add(mesh(new THREE.CylinderGeometry(.205,.205,.06,9),waxD,0,.58,0));
+  for(let i=0;i<9;i++){ const a=i/9*PI*2; head.add(mesh(new THREE.ConeGeometry(.035,R(.15,.4),5),wax,Math.cos(a)*.2,R(.25,.45),Math.sin(a)*.2,PI)); }
+  const eyeM=new THREE.MeshBasicMaterial({color:'#050202'}); for(const s of [-1,1]) head.add(mesh(new THREE.SphereGeometry(.055,6,5),eyeM,s*.08,.32,.18,0,0,s*.3,1,1.4,.5));
+  head.add(mesh(new THREE.SphereGeometry(.06,6,4),eyeM,.02,.16,.19,0,0,.3,1.4,.7,.4));
+  head.add(mesh(new THREE.CylinderGeometry(.01,.01,.08,4),P('#1a1410'),0,.65,0));
+  const fl=flameSprite(); fl.scale.set(.32,.6,1); fl.position.y=.92; head.add(fl); const hl=sprite('#ffaa50',1.6,.45); hl.position.y=.85; head.add(hl);
+  const pl=new THREE.PointLight('#ffa040',1.4,5,2); pl.position.y=.9; head.add(pl);
+  // 長い腕と滴る指
+  const arms=[]; for(const s of [-1,1]){ const sh=new THREE.Group(); sh.position.set(s*.38,1.88,0); g.add(sh); sh.add(limb(.6,.08,.07,wax)); const el=new THREE.Group(); el.position.y=-.6; sh.add(el); el.add(limb(.6,.07,.05,wax));
+    for(let k=-1;k<=1;k++) el.add(mesh(new THREE.ConeGeometry(.025,.3,5),wax,k*.04,-.72,0,PI)); sh.rotation.z=s*.15; arms.push({sh,el}); }
+  // 胴体の滴り
+  for(let i=0;i<16;i++){ const a=R(0,PI*2),y=R(1.15,1.95); g.add(mesh(new THREE.ConeGeometry(R(.02,.045),R(.1,.35),5),wax,Math.cos(a)*.34,y,Math.sin(a)*.34,PI)); }
+  const drops=[]; for(let i=0;i<4;i++){ const d=mesh(new THREE.SphereGeometry(.03,5,4),wax); g.add(d); drops.push({d,ph:R(0,3),x:R(-.3,.3),z:R(-.2,.2)}); }
+  return {g,update(t,w){ fl.scale.set(.3+Math.sin(t*17)*.03,.6+Math.sin(t*11)*.06,1); pl.intensity=1.3+Math.sin(t*13)*.25; head.rotation.z=Math.sin(t*.9)*.06;
+    arms.forEach((a,i)=>{ a.sh.rotation.x=w?Math.sin(t*4+(i?0:PI))*.4:Math.sin(t*1.2+i)*.08-.1; a.el.rotation.x=-.3; });
+    if(w) walkLegs(L,t*4,.45); else L.forEach(l=>{ l.hip.rotation.x=0; l.knee.rotation.x=0; });
+    drops.forEach(D=>{ const k=((t*.6+D.ph)%1); D.d.position.set(D.x,1.3-k*1.3,D.z); D.d.scale.setScalar(k<.95?1:0); }); g.position.y=w?Math.abs(Math.sin(t*4))*.04:0; }}; }});
+
+// 二、朧（おぼろ）— 霧から生まれた、脚のない頭巾の亡霊
+DEMONS.push({id:'oboro',name:'朧',kana:'おぼろ',tag:'霧の悪魔',
+ text:'森の霧が凝り固まって人の形になったもの。脚はなく、ぼろぼろの衣の裾は霧に溶けている。頭巾の奥には顔がなく、青白い二つの目だけが浮かぶ。',
+ stats:[['足の速さ','おそい'],['鬼としての力','足音がしない。霧の中では姿がほとんど見えない'],['弱点','灯りの下では体が薄れて動きが止まる'],['気配','近づくと吐く息が白くなる']],
+ build(){ const g=new THREE.Group(); const robe=P('#5a6070',{transparent:true,opacity:.82,roughness:1}), dark=P('#20242e',{roughness:1});
+  const rg=lathe([[0,.05],[.55,.05],[.48,.5],[.38,1.1],[.3,1.55],[.34,1.75],[.18,1.92],[0,1.95]],12); const p=rg.attributes.position; for(let i=0;i<p.count;i++){ if(p.getY(i)<.1) p.setY(i,R(-.15,.25)); } rg.computeVertexNormals();
+  const body=mesh(jitter(rg,.03),robe); g.add(body);
+  // ぼろの裾
+  const tat=[]; for(let i=0;i<14;i++){ const a=i/14*PI*2, s=mesh(new THREE.PlaneGeometry(.22,R(.5,.9),1,3),new THREE.MeshStandardMaterial({color:'#5a6070',transparent:true,opacity:.55,side:THREE.DoubleSide,flatShading:true})); s.position.set(Math.cos(a)*.5,.05,Math.sin(a)*.5); s.rotation.y=-a+PI/2; g.add(s); tat.push({s,a}); }
+  const hood=new THREE.Group(); hood.position.y=1.95; g.add(hood);
+  hood.add(mesh(jitter(new THREE.ConeGeometry(.3,.62,9,2,true),.02),robe,0,.18,-.02));
+  hood.add(mesh(new THREE.SphereGeometry(.22,8,6),new THREE.MeshBasicMaterial({color:'#030305'}),0,.05,.06,0,0,0,1,1.1,.8));
+  for(const s of [-1,1]){ hood.add(mesh(new THREE.SphereGeometry(.035,6,5),glow('#aee0ff',3),s*.08,.08,.24)); const sp=sprite('#90c8ff',.35,.8); sp.position.set(s*.08,.08,.26); hood.add(sp); }
+  const arms=[]; for(const s of [-1,1]){ const sh=new THREE.Group(); sh.position.set(s*.34,1.62,.05); g.add(sh); sh.add(limb(.55,.08,.11,robe)); const el=new THREE.Group(); el.position.y=-.55; sh.add(el); el.add(limb(.45,.035,.03,dark));
+    for(let k=0;k<4;k++) el.add(mesh(new THREE.ConeGeometry(.012,.26,4),dark,(k-1.5)*.025,-.55,.02,PI+.2)); sh.rotation.set(-.6,0,s*.25); arms.push({sh,el}); }
+  const mist=[]; for(let i=0;i<10;i++){ const m=sprite('#a8b4cc',R(.8,1.4),.18); g.add(m); mist.push({m,ph:R(0,6),r:R(.3,.7)}); }
+  return {g,update(t,w){ g.position.y=.35+Math.sin(t*1.6)*.08; g.rotation.z=Math.sin(t*.7)*.04; body.material.opacity=.75+Math.sin(t*2.3)*.07;
+    tat.forEach((T,i)=>{ T.s.rotation.x=Math.sin(t*2+i)*.25+(w?.5:0); });
+    arms.forEach((a,i)=>{ a.sh.rotation.x=(w?-1.3:-.6)+Math.sin(t*1.5+i*1.7)*.12; a.el.rotation.x=-.2+Math.sin(t*2+i)*.1; });
+    mist.forEach(M=>{ const k=(t*.25+M.ph)%1; M.m.position.set(Math.cos(M.ph*3+t*.4)*M.r,k*.9,Math.sin(M.ph*3+t*.4)*M.r); M.m.material.opacity=.2*(1-k); }); }}; }});
+
+// 三、鉄錠（てつじょう）— 鉄仮面と鎖の巨漢
+DEMONS.push({id:'tetsujo',name:'鉄錠',kana:'てつじょう',tag:'錠前の悪魔',
+ text:'開かずの一室の鍵番。錆びた鉄の仮面を顔に打ちつけられ、胸には巨大な南京錠がぶら下がっている。両手首から垂れた鎖を引きずり、扉という扉の前に立ちふさがる。',
+ stats:[['足の速さ','とてもおそい'],['鬼としての力','扉の前に立つと、その扉は通れなくなる'],['弱点','階段を上り下りするのが遅い'],['気配','鎖を引きずる音が遠くまで響く']],
+ build(){ const g=new THREE.Group(); const skin=P('#5a4a44',{roughness:.9}), iron=P('#3a3532',{metalness:.7,roughness:.45}), rust=P('#6a3a22',{metalness:.4,roughness:.7}), leather=P('#2a1a12',{roughness:.9}), eyeG=glow('#ff7a20',3);
+  const L=legs(leather,.5,.2,[.34,.16,.5],iron,.24); L.forEach(l=>g.add(l.hip));
+  const torso=mesh(jitter(lathe([[0,.95],[.42,1.0],[.55,1.3],[.62,1.7],[.58,1.95],[.3,2.08],[0,2.1]],10),.03),skin); torso.scale.z=.75; g.add(torso);
+  g.add(mesh(lathe([[.5,.9],[.56,1.1],[.6,1.45],[.62,1.5]],10),leather,0,0,0,0,0,0,1,1,.78));
+  for(let i=0;i<10;i++){ const a=i/10*PI*2; g.add(mesh(new THREE.CylinderGeometry(.03,.03,.05,5),iron,Math.cos(a)*.6,1.48,Math.sin(a)*.47,PI/2,0,a)); }
+  // 胸の南京錠
+  const lock=new THREE.Group(); lock.position.set(0,1.45,.48); g.add(lock); lock.add(mesh(new THREE.BoxGeometry(.42,.38,.14),rust)); lock.add(mesh(new THREE.TorusGeometry(.14,.04,6,10,PI),iron,0,.19,0)); lock.add(mesh(new THREE.CylinderGeometry(.035,.035,.16,6),new THREE.MeshBasicMaterial({color:'#000'}),0,-.03,.06,PI/2));
+  // 頭と鉄仮面
+  const head=new THREE.Group(); head.position.set(0,2.1,.05); g.add(head);
+  head.add(mesh(new THREE.SphereGeometry(.24,8,6),skin,0,.18,0,0,0,0,1,1.1,1));
+  head.add(mesh(new THREE.BoxGeometry(.42,.5,.12),rust,0,.18,.2));
+  head.add(mesh(new THREE.BoxGeometry(.44,.06,.14),iron,0,.3,.21)); head.add(mesh(new THREE.BoxGeometry(.06,.5,.14),iron,0,.18,.21));
+  for(const s of [-1,1]){ head.add(mesh(new THREE.BoxGeometry(.11,.025,.02),eyeG,s*.1,.3,.285)); for(const yy of [.02,.38]) head.add(mesh(new THREE.SphereGeometry(.02,5,4),iron,s*.17,yy,.27)); }
+  for(let i=0;i<5;i++) head.add(mesh(new THREE.BoxGeometry(.012,.12,.02),new THREE.MeshBasicMaterial({color:'#000'}),(i-2)*.05,.06,.27));
+  // 太い腕・手枷・鎖
+  const arms=[], chains=[]; for(const s of [-1,1]){ const sh=new THREE.Group(); sh.position.set(s*.66,1.86,0); g.add(sh); sh.add(mesh(new THREE.SphereGeometry(.2,7,5),skin)); sh.add(limb(.55,.17,.14,skin)); const el=new THREE.Group(); el.position.y=-.55; sh.add(el); el.add(limb(.5,.14,.12,skin));
+    el.add(mesh(new THREE.CylinderGeometry(.16,.16,.16,8),iron,0,-.42,0)); el.add(mesh(new THREE.BoxGeometry(.24,.2,.22),skin,0,-.62,.02));
+    const ch=new THREE.Group(); ch.position.y=-.5; el.add(ch); for(let k=0;k<9;k++){ const lk=mesh(new THREE.TorusGeometry(.055,.016,5,8),iron,0,-k*.09,0,0,k%2?PI/2:0); ch.add(lk); } chains.push(ch); sh.rotation.z=s*.12; arms.push({sh,el}); }
+  return {g,update(t,w){ g.rotation.y=Math.sin(t*.5)*.03; head.rotation.x=.08+Math.sin(t*.8)*.04; const br=1+Math.sin(t*1.4)*.015; torso.scale.set(br,1,.75*br);
+    arms.forEach((a,i)=>{ a.sh.rotation.x=w?Math.sin(t*2.4+(i?0:PI))*.3:Math.sin(t*.9+i)*.05; a.el.rotation.x=-.2; }); chains.forEach((c,i)=>{ c.rotation.x=Math.sin(t*2+i)*.25+(w?.4:0); c.rotation.z=Math.sin(t*1.7+i)*.15; });
+    if(w){ walkLegs(L,t*2.4,.32); g.position.y=Math.abs(Math.sin(t*2.4))*.05; g.rotation.z=Math.sin(t*2.4)*.05; } else { L.forEach(l=>{ l.hip.rotation.x=0; l.knee.rotation.x=0; }); g.position.y=0; g.rotation.z=0; } }}; }});
+
+// 四、操（あやつり）— 磁器の仮面をつけた、糸繰りの蜘蛛の悪魔
+DEMONS.push({id:'ayatsuri',name:'操',kana:'あやつり',tag:'糸繰りの悪魔',
+ text:'老人が最初に作った人形の成れの果て。ひびの入った磁器の仮面に、六本の細い脚。二本の腕で十字の操り板を握り、天井から垂らした糸で人も人形も思いのままに動かす。',
+ stats:[['足の速さ','速い（ただし急に止まる）'],['鬼としての力','箪笥や棺の中を糸で探り、隠れている者を引きずり出す'],['弱点','まっすぐな長い廊下では脚がもつれる'],['気配','カサカサという足音と、糸のきしむ音']],
+ build(){ const g=new THREE.Group(); const shell=P('#2a1e24',{roughness:.5}), joint=P('#7a1018',{roughness:.4}), porc=P('#efe8e0',{roughness:.2,metalness:.05}), cloth=P('#3a0e14',{roughness:.9,side:THREE.DoubleSide}), str=new THREE.LineBasicMaterial({color:'#d8d0c0',transparent:true,opacity:.6});
+  const body=new THREE.Group(); body.position.y=.95; g.add(body);
+  body.add(mesh(jitter(new THREE.SphereGeometry(.34,9,6),.02),shell,0,0,-.25,0,0,0,1,.8,1.4));
+  body.add(mesh(lathe([[0,0],[.22,.05],[.26,.3],[.2,.55],[0,.6]],8),cloth,0,.05,.18));
+  // 磁器の仮面
+  const head=new THREE.Group(); head.position.set(0,.78,.22); body.add(head);
+  head.add(mesh(new THREE.SphereGeometry(.17,10,8),porc,0,0,0,0,0,0,.9,1.15,.9));
+  const fm=(()=>{ const c=cnv(128,128),x=c.getContext('2d'); x.fillStyle='#efe8e0'; x.fillRect(0,0,128,128); x.fillStyle='#0a0606'; for(const s of [-1,1]){ x.beginPath(); x.ellipse(64+s*20,58,10,14,0,0,PI*2); x.fill(); } x.fillStyle='#7a1018'; x.beginPath(); x.ellipse(64,92,8,3,0,0,PI*2); x.fill();
+    x.strokeStyle='#3a2a2a'; x.lineWidth=2; x.beginPath(); x.moveTo(40,10); x.lineTo(52,40); x.lineTo(46,62); x.lineTo(58,90); x.stroke(); x.beginPath(); x.moveTo(52,40); x.lineTo(70,48); x.stroke(); x.strokeStyle='rgba(120,0,0,.6)'; x.beginPath(); x.moveTo(84,72); x.lineTo(86,110); x.stroke(); return tex(c); })();
+  head.add(mesh(new THREE.CircleGeometry(.14,16),new THREE.MeshStandardMaterial({map:fm,roughness:.2}),0,0,.155,0,0,0,.95,1.15,1));
+  for(let i=0;i<7;i++){ const a=-PI/2+(i-3)*.3; head.add(mesh(new THREE.ConeGeometry(.03,R(.12,.22),4),shell,Math.sin(a)*.15,.17+Math.cos(a)*.03,-.05,-.4,0,-a*.6)); }
+  // 六本の脚
+  const LEGS=[]; for(let i=0;i<6;i++){ const s=i<3?-1:1, k=i%3; const hip=new THREE.Group(); hip.position.set(s*.22,0,-.05-k*.22); body.add(hip); hip.rotation.y=s*(-.5+k*.5);
+    const up=new THREE.Group(); hip.add(up); up.rotation.z=s*-.9; const seg1=limb(.6,.035,.025,shell); seg1.rotation.z=PI/2*s; up.add(seg1); seg1.position.set(0,0,0);
+    const j=new THREE.Group(); j.position.set(s*.6,0,0); up.add(j); j.add(mesh(new THREE.SphereGeometry(.045,6,4),joint)); const seg2=limb(.85,.025,.01,shell); j.add(seg2); j.rotation.z=s*.9;
+    LEGS.push({hip,up,j,s,ph:k*2.1+(s>0?PI:0)}); }
+  // 腕と操り板
+  const bar=new THREE.Group(); bar.position.set(0,1.2,.45); body.add(bar); bar.add(mesh(new THREE.BoxGeometry(.6,.03,.03),P('#4a3020'))); bar.add(mesh(new THREE.BoxGeometry(.03,.03,.4),P('#4a3020')));
+  for(const s of [-1,1]){ const a=limb(.62,.03,.02,shell); a.position.set(s*.16,.4,.2); a.rotation.set(-2.6,0,s*.4); body.add(a); }
+  const lines=[]; for(const [x,z] of [[-.3,0],[.3,0],[0,-.2],[0,.2],[-.15,0],[.15,0]]){ const gg=new THREE.BufferGeometry().setFromPoints([V3(x,0,z),V3(x*1.3,-1.5,z+.3)]); const l=new THREE.Line(gg,str); bar.add(l); lines.push(l); }
+  return {g,body,update(t,w){ const sp=w?7:1.5; body.position.y=.95+Math.sin(t*sp*2)*.03; bar.rotation.z=Math.sin(t*1.3)*.25; bar.rotation.x=Math.sin(t*.9)*.15; head.rotation.z=Math.sin(t*.6)*.25+(Math.sin(t*3.1)>.97?.6:0);
+    LEGS.forEach(L=>{ const p=t*sp+L.ph; L.up.rotation.z=L.s*(-.9+(w?Math.max(0,Math.sin(p))*.4:Math.sin(p)*.05)); L.hip.rotation.y=L.s*(-.5+(L.hip.position.z+.05)/-.22*.5)+(w?Math.cos(p)*.25:0); }); }}; }});
+
+// 五、黒羽（くろは）— 鴉の頭と羽の外套をもつ、森の見張り
+DEMONS.push({id:'kuroha',name:'黒羽',kana:'くろは',tag:'鴉の悪魔',
+ text:'森の枯れ木の上から館を見張る悪魔。鴉の頭に、無数の黒い羽を綴った外套。鳥の脚で音もなく枝から枝へ跳び、獣道を逃げる者の上に舞い降りる。',
+ stats:[['足の速さ','とても速い（屋外のみ）'],['鬼としての力','高い枝から森全体を見渡し、獣道を走る者を見つける'],['弱点','館の中では羽が引っかかり遅くなる'],['気配','頭上で羽ばたく音と鳴き声']],
+ build(){ const g=new THREE.Group(); const fe=P('#14121a',{roughness:.5,metalness:.2}), feB=P('#1e2030',{roughness:.45,metalness:.3}), beak=P('#2a2420',{roughness:.3,metalness:.3}), talon=P('#3a3020',{roughness:.5}), eyeG=glow('#ffd040',3);
+  // 鳥の脚（逆関節）
+  const L=[]; for(const s of [-1,1]){ const hip=new THREE.Group(); hip.position.set(s*.16,1.0,0); g.add(hip); const th=limb(.45,.09,.06,fe); th.rotation.x=.6; hip.add(th); const kn=new THREE.Group(); kn.position.set(0,-.37,.26); hip.add(kn); const sh=limb(.6,.035,.03,talon); sh.rotation.x=-.45; kn.add(sh);
+    const ft=new THREE.Group(); ft.position.set(0,-.55,-.27); kn.add(ft); for(const a of [-.4,0,.4]) ft.add(mesh(new THREE.ConeGeometry(.02,.22,4),talon,Math.sin(a)*.08,-.02,Math.cos(a)*.1,PI/2,a)); ft.add(mesh(new THREE.ConeGeometry(.02,.16,4),talon,0,-.02,-.1,-PI/2)); L.push({hip,knee:kn}); }
+  const torso=mesh(jitter(lathe([[0,.9],[.3,.95],[.36,1.2],[.32,1.55],[.22,1.75],[0,1.8]],9),.02),feB); torso.rotation.x=.15; g.add(torso);
+  // 羽の外套
+  const cloak=new THREE.Group(); g.add(cloak); const fg=new THREE.PlaneGeometry(.12,.42,1,2); fg.translate(0,-.21,0);
+  for(let r=0;r<6;r++) for(let i=0;i<16;i++){ const a=(i/15-.5)*PI*1.4+PI, y=1.75-r*.17, rad=.3+r*.06; const f=mesh(fg,r%2?fe:feB,Math.sin(a)*rad,y,Math.cos(a)*rad,.25,a+R(-.1,.1),R(-.15,.15)); f.material=f.material; cloak.add(f); }
+  // 翼
+  const wings=[]; for(const s of [-1,1]){ const wg=new THREE.Group(); wg.position.set(s*.25,1.6,-.2); g.add(wg); for(let i=0;i<9;i++){ const f=mesh(new THREE.PlaneGeometry(.16,.9-i*.04,1,2),fe,s*(.15+i*.14),-.2-i*.03,0,0,0,s*(.15+i*.06)); f.material=new THREE.MeshStandardMaterial({color:'#08070c',side:THREE.DoubleSide,flatShading:true,roughness:.9}); wg.add(f); } wings.push({wg,s}); }
+  // 鴉の頭
+  const head=new THREE.Group(); head.position.set(0,1.85,.08); g.add(head);
+  head.add(mesh(new THREE.SphereGeometry(.2,8,6),fe,0,.06,0,0,0,0,1,1,1.1));
+  head.add(mesh(new THREE.ConeGeometry(.08,.42,6),beak,0,.02,.32,PI/2,0,0,1,1,.7));
+  head.add(mesh(new THREE.ConeGeometry(.06,.3,6),beak,0,-.04,.27,PI/2+.15,0,0,1,1,.5));
+  for(const s of [-1,1]){ head.add(mesh(new THREE.SphereGeometry(.035,6,5),eyeG,s*.12,.1,.12)); for(let k=0;k<4;k++) head.add(mesh(new THREE.ConeGeometry(.025,.2,4),fe,s*.04*k,.24,-.1-k*.04,-.9)); }
+  return {g,update(t,w){ head.rotation.y=Math.sin(t*.8)*.5*(Math.sin(t*.37)>0?1:-1); head.rotation.x=Math.sin(t*2.7)>.95?.4:0;
+    wings.forEach(W=>{ W.wg.rotation.y=W.s*(w?-.2+Math.sin(t*9)*.9:-.9+Math.sin(t*1.2)*.08); W.wg.rotation.z=W.s*(w?Math.sin(t*9)*.3:0); });
+    if(w){ L.forEach((l,i)=>{ const p=t*6+(i?PI:0); l.hip.rotation.x=Math.sin(p)*.5; }); g.position.y=Math.abs(Math.sin(t*6))*.12; } else { L.forEach(l=>l.hip.rotation.x=0); g.position.y=0; } }}; }});
+
+// 六、贄角（にえづの）— 儀式を司る山羊頭の司祭
+DEMONS.push({id:'niezuno',name:'贄角',kana:'にえづの',tag:'山羊頭の悪魔・鬼の頭',
+ text:'儀式の間の祭壇に仕える、山羊の頭をもつ司祭。渦を巻く大きな角と、燃えるような赤い目。深紅の祭服に金の縁取り、手には頭に灯をともした杖。ほかの五体を呼び集める、鬼たちの頭目。',
+ stats:[['足の速さ','ふつう'],['鬼としての力','杖を打ち鳴らすと、ほかの鬼たちがその場所へ集まってくる'],['弱点','儀式の間から遠く離れるほど力が弱まる'],['気配','低い詠唱と、蹄が床を打つ音']],
+ build(){ const g=new THREE.Group(); const robe=P('#5a0c14',{roughness:.85}), gold=P('#b08a3c',{metalness:.9,roughness:.3}), fur=P('#3a2e26',{roughness:1}), horn=P('#cbbfa4',{roughness:.5}), hoof=P('#1a1410',{roughness:.4}), eyeG=glow('#ff2010',3.5);
+  const L=legs(fur,.5,.11,[.16,.14,.2],hoof,.15); L.forEach(l=>g.add(l.hip));
+  const rb=mesh(jitter(lathe([[0,.25],[.5,.22],[.46,.6],[.38,1.1],[.36,1.5],[.42,1.78],[.25,1.95],[0,1.97]],12),.02),robe); g.add(rb);
+  for(const y of [.24,.27]) g.add(mesh(new THREE.TorusGeometry(.5,.02,4,16),gold,0,y,0,PI/2));
+  g.add(mesh(new THREE.BoxGeometry(.16,1.5,.02),gold,0,1.0,.4,-.08)); g.add(mesh(new THREE.TorusGeometry(.42,.03,4,14),gold,0,1.78,0,PI/2));
+  // 首飾り（骨の数珠）
+  for(let i=0;i<12;i++){ const a=i/12*PI*2; g.add(mesh(new THREE.SphereGeometry(.035,5,4),P('#e8e0cc'),Math.cos(a)*.3,1.83-Math.max(0,Math.sin(a))*.18,Math.sin(a)*.25+.08)); }
+  // 山羊の頭
+  const head=new THREE.Group(); head.position.set(0,2.0,.05); g.add(head);
+  head.add(mesh(new THREE.SphereGeometry(.2,8,6),fur,0,.12,0,0,0,0,.9,1.1,1));
+  head.add(mesh(new THREE.CylinderGeometry(.08,.13,.38,7),fur,0,0,.2,PI/2-.35));
+  head.add(mesh(new THREE.ConeGeometry(.07,.22,5),fur,0,-.2,.2,PI));
+  for(const s of [-1,1]){ head.add(mesh(new THREE.SphereGeometry(.04,6,5),eyeG,s*.13,.14,.14,0,0,0,1.4,.7,1)); const sp=sprite('#ff3010',.3,.8); sp.position.set(s*.13,.14,.17); head.add(sp);
+    head.add(mesh(new THREE.ConeGeometry(.06,.2,4),fur,s*.24,.12,-.02,0,0,s*1.4,1,1,.4));
+    const pts=[]; for(let i=0;i<=24;i++){ const k=i/24, a=k*PI*1.6, r=.22*(1-k*.45); pts.push(V3(s*(.12+k*.18+Math.cos(a)*r*.2),.28+Math.sin(a)*r+k*.05,-.05-(1-Math.cos(a))*r)); }
+    const tg=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,.06,6,false); const tp=tg.attributes.position; // 先細り
+    for(let i=0;i<tp.count;i++){ const ring=Math.floor(i/7), k=ring/24; const c=pts[Math.min(24,ring)]; tp.setXYZ(i,c.x+(tp.getX(i)-c.x)*(1-k*.85),c.y+(tp.getY(i)-c.y)*(1-k*.85),c.z+(tp.getZ(i)-c.z)*(1-k*.85)); } tg.computeVertexNormals(); head.add(mesh(tg,horn)); }
+  // 杖
+  const arms=[]; for(const s of [-1,1]){ const sh=new THREE.Group(); sh.position.set(s*.4,1.75,0); g.add(sh); sh.add(limb(.5,.1,.12,robe)); const el=new THREE.Group(); el.position.y=-.5; sh.add(el); el.add(limb(.45,.11,.13,robe)); el.add(mesh(new THREE.SphereGeometry(.06,6,4),fur,0,-.5,0)); arms.push({sh,el}); }
+  const staff=new THREE.Group(); staff.position.set(.12,-.5,.05); arms[1].el.add(staff); staff.add(mesh(new THREE.CylinderGeometry(.025,.025,2.3,6),P('#2a1a10'),0,.25,0));
+  staff.add(mesh(new THREE.TorusGeometry(.14,.02,5,10,PI*1.4),gold,0,1.5,0,0,0,.6)); staff.add(mesh(new THREE.CylinderGeometry(.04,.05,.16,8),P('#efe6d2'),0,1.43,0));
+  const fl=flameSprite(); fl.scale.set(.18,.35,1); fl.position.y=1.65; staff.add(fl); const pl=new THREE.PointLight('#ff6a30',1.2,5,2); pl.position.y=1.65; staff.add(pl);
+  arms[1].sh.rotation.set(-.5,0,.25); arms[1].el.rotation.x=-.9; arms[0].sh.rotation.set(-.3,0,-.2);
+  return {g,update(t,w){ head.rotation.y=Math.sin(t*.5)*.2; head.rotation.x=Math.sin(t*.9)*.05; fl.scale.set(.18+Math.sin(t*15)*.02,.35+Math.sin(t*9)*.04,1); pl.intensity=1.1+Math.sin(t*12)*.2;
+    arms[0].el.rotation.x=-.4+Math.sin(t*1.1)*.15; arms[0].sh.rotation.x=-.3+(w?Math.sin(t*3)*.3:0);
+    if(w){ walkLegs(L,t*3,.35); g.position.y=Math.abs(Math.sin(t*3))*.03; } else { L.forEach(l=>{ l.hip.rotation.x=0; l.knee.rotation.x=0; }); g.position.y=0; } }}; }});
+
+/* ---------- 舞台 ---------- */
+const floor=new THREE.Mesh(new THREE.CircleGeometry(14,48),new THREE.MeshStandardMaterial({color:'#1a1416',roughness:.9})); floor.rotation.x=-PI/2; floor.receiveShadow=true; scene.add(floor);
+{ const c=cnv(512,512),x=c.getContext('2d'); x.strokeStyle='rgba(150,10,16,.85)'; x.lineWidth=8; x.beginPath(); x.arc(256,256,236,0,PI*2); x.stroke(); x.lineWidth=3; x.beginPath(); x.arc(256,256,206,0,PI*2); x.stroke(); x.lineWidth=5; x.beginPath(); for(let i=0;i<=6;i++){ const a=-PI/2+i*PI*2/6*2; const px=256+Math.cos(a)*206,py=256+Math.sin(a)*206; i?x.lineTo(px,py):x.moveTo(px,py); } x.stroke();
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(9,9),new THREE.MeshStandardMaterial({map:tex(c),transparent:true,depthWrite:false,roughness:.5})); m.rotation.x=-PI/2; m.position.y=.01; m.receiveShadow=true; scene.add(m); }
+const RAD=3.4, ACT=[];
+DEMONS.forEach((d,i)=>{ const a=PI+(i-2.5)/5*PI*1.05; const base=new THREE.Group(); base.position.set(Math.sin(a)*RAD,0,Math.cos(a)*RAD); base.lookAt(0,0,0); scene.add(base);
+  const ped=new THREE.Mesh(new THREE.CylinderGeometry(.6,.7,.12,8),new THREE.MeshStandardMaterial({color:'#2a2226',roughness:.6,flatShading:true})); ped.position.y=.06; ped.receiveShadow=true; base.add(ped);
+  const holder=new THREE.Group(); holder.position.y=.12; base.add(holder); const o=d.build(); holder.add(o.g); o.g.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.userData.di=i; } });
+  const cand=sprite('#ff9a40',.5,.6); cand.position.set(.75,.4,.3); base.add(cand);
+  ACT.push({d,o,base,holder}); });
+// 地の霧
+const fogs=[]; for(let i=0;i<24;i++){ const s=sprite('#8890a8',R(3,6),.08); s.material.blending=THREE.NormalBlending; s.position.set(R(-7,7),R(.2,.8),R(-7,7)); scene.add(s); fogs.push(s); }
+
+/* ---------- 操作 ---------- */
+let sel=-1, walking=false, yaw=0, pitch=.18, dist=13, tgt=V3(0,1.1,-1.2), curT=V3(0,1.1,-1.2), curD=innerWidth<innerHeight?13.5:9;
+const $=id=>document.getElementById(id);
+function show(i){ sel=i; document.getElementById('all').classList.toggle('on',i<0);
+  if(i<0){ $('kk').textContent='鬼ごっこの鬼役'; $('nm').innerHTML='悪魔 六体'; $('tx').textContent='霧ノ森の館に巣くう六体の悪魔。鬼ごっこでは、この中から鬼役が選ばれて逃げる者を追いかけます。悪魔をタップすると、一体ずつ詳しく見られます。'; $('dl').innerHTML=innerWidth<innerHeight?'':DEMONS.map(d=>`<dt>${d.name}</dt><dd>${d.tag}</dd>`).join(''); tgt.set(0,innerWidth<innerHeight?-.2:1.1,-1.2); dist=innerWidth<innerHeight?13.5:9.5; return; }
+  const A=ACT[i], d=A.d; $('kk').textContent=`其の${'一二三四五六'[i]} · ${d.kana}`; $('nm').innerHTML=`${d.name}<span>${d.tag}</span>`; $('tx').textContent=d.text; $('dl').innerHTML=d.stats.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
+  const p=A.base.position; tgt.set(p.x,innerWidth<innerHeight?.55:1.15,p.z); dist=innerWidth<innerHeight?4.6:4.2; yaw=Math.atan2(p.x,p.z); }
+$('prev').onclick=()=>show(sel<=0?5:sel-1); $('next').onclick=()=>show(sel>=5?0:sel+1); $('all').onclick=()=>show(-1);
+$('walk').onclick=()=>{ walking=!walking; $('walk').classList.toggle('on',walking); $('walk').textContent=walking?'止める':'歩かせる'; };
+let drag=null, moved=0; const ray=new THREE.Raycaster();
+cv.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; moved=0; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag={x:e.clientX,y:e.clientY}; moved+=Math.abs(dx)+Math.abs(dy); yaw-=dx*.008; pitch=Math.max(-.1,Math.min(1.1,pitch+dy*.005)); });
+cv.addEventListener('pointerup',e=>{ drag=null; if(moved<8){ ray.setFromCamera({x:e.clientX/innerWidth*2-1,y:-e.clientY/innerHeight*2+1},camera); const h=ray.intersectObjects(scene.children,true).find(h=>h.object.userData.di!=null); if(h) show(h.object.userData.di); } });
+cv.addEventListener('wheel',e=>{ dist=Math.max(2.2,Math.min(12,dist+e.deltaY*.005)); },{passive:true});
+addEventListener('resize',()=>{ camera.fov=innerWidth<innerHeight?62:42; camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+show(-1);
+const T0=performance.now(); let lastN=T0;
+function loop(now){ requestAnimationFrame(loop); const t=(now-T0)/1000; const dt=Math.min(.1,(now-lastN)/1000); lastN=now; const kk=1-Math.exp(-dt*4);
+  ACT.forEach((A,i)=>{ A.o.update(t+i*.7,walking); A.holder.rotation.y=walking?Math.sin(t*.3+i)*.2:0; });
+  fogs.forEach((s,i)=>{ s.position.x+=Math.sin(t*.1+i)*.003; });
+  curT.lerp(tgt,kk); curD+=(dist-curD)*kk; if(!drag&&sel<0) yaw+=.0015;
+  camera.position.set(curT.x+Math.sin(yaw)*Math.cos(pitch)*curD*-1*(sel<0?-1:-1),curT.y+Math.sin(pitch)*curD,curT.z+Math.cos(yaw)*Math.cos(pitch)*curD*(sel<0?1:-1)*-1*-1);
+  if(sel>=0){ const p=ACT[sel].base.position; const dir=V3(-p.x,0,-p.z).normalize(); const a=Math.atan2(dir.x,dir.z)+ (yaw-Math.atan2(p.x,p.z)); camera.position.set(curT.x+Math.sin(a)*Math.cos(pitch)*curD,curT.y+Math.sin(pitch)*curD,curT.z+Math.cos(a)*Math.cos(pitch)*curD); }
+  else camera.position.set(curT.x+Math.sin(yaw)*Math.cos(pitch)*curD,curT.y+Math.sin(pitch)*curD,curT.z+Math.cos(yaw)*Math.cos(pitch)*curD);
+  key.target.position.copy(curT); camera.lookAt(curT); renderer.render(scene,camera); }
+requestAnimationFrame(loop);
+window.__d={show,ACT,setWalk:v=>{walking=v;}};
+</script>
+</body>
+</html>
