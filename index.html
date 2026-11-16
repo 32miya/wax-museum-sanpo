@@ -450,7 +450,7 @@ function slab(x0,x1,z0,z1,y){ SLABS.push({x0:Math.min(x0,x1),x1:Math.max(x0,x1),
 const FOOT={x0:-20.3,x1:20.3,z0:-10.3,z1:30.3};
 function inR(r,x,z,m){ m=m||0; return x>r.x0-m&&x<r.x1+m&&z>r.z0-m&&z<r.z1+m; }
 function surfaceAt(x,z,yf){ let best=-1e9; const lim=yf+.62;
-  if(!inR(FOOT,x,z)){ const h=terrH(x,z); if(h<=lim) best=h; }
+  if(!inR(FOOT,x,z,-.45)){ const h=terrH(x,z); if(h<=lim) best=h; }
   for(const s of SLABS) if(x>=s.x0&&x<=s.x1&&z>=s.z0&&z<=s.z1&&s.y<=lim&&s.y>best) best=s.y;
   for(const r of RAMPS) if(x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1){ const t=r.ax==='z'?(z-r.z0)/(r.z1-r.z0):(x-r.x0)/(r.x1-r.x0); const y=r.ya+(r.yb-r.ya)*t; if(y<=lim&&y>best) best=y; }
   return best; }
@@ -568,7 +568,7 @@ RAMPS.push({x0:17.1,x1:19.6,z0:26,z1:28,ya:-4,yb:-4,ax:'z'});
 for(let z=14.2;z<=26;z+=.5) boxAt('iron',16.98,17.02,0,1,z-.02,z+.02); boxAt('iron',16.95,17.05,.95,1.02,14.2,26); collide(16.9,17.1,14.6,26,0,1.1); collide(17,20,13.9,14.1,-4,-.1);
 boxAt('stoneD',17,17.2,-4,0,14.2,25.6); collide(16.8,17.2,14.6,25.6,-4,-.2);
 // 玄関ポーチ
-slab(-3.6,3.6,30.2,34,.3); boxAt('stone',-3.6,3.6,-.2,.3,30.25,34); for(let i=0;i<2;i++) boxAt('stone',-2.6,2.6,-.2,.15-i*.08,34+i*.45,34.45+i*.45);
+slab(-3.6,3.6,29.8,34,.3); boxAt('stone',-3.6,3.6,-.2,.3,30.25,34); for(let i=0;i<2;i++) boxAt('stone',-2.6,2.6,-.2,.15-i*.08,34+i*.45,34.45+i*.45);
 for(const x of [-3.2,3.2]) for(const z of [33.6]){ const cg=new THREE.CylinderGeometry(.22,.26,3.4,12); bk('stone').add(cg,TM(x,2,z)); collide(x-.25,x+.25,z-.25,z+.25); }
 bk('stone').add(BOXG,TM(0,3.8,32.2,0,7.6,.35,3.8)); bk('slate').add(BOXG,TM(0,4.15,32.2,0,8,.25,4.2,-.12));
 // 扉（開いた両開き）
