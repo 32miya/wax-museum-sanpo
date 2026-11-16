@@ -470,7 +470,15 @@ function surfaceAt(x,z,yf){ let best=-1e9; const lim=yf+.62;
 /* ---------- 地形 ---------- */
 const PATH=[[0,192],[3,176],[-4,160],[-9,146],[-3,130],[6,116],[9,100],[3,84],[-2,70],[0,58],[0,46],[0,34]];
 function segD(px,pz,a,b){ const dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((px-a[0])*dx+(pz-a[1])*dz)/(dx*dx+dz*dz))); return Math.hypot(px-a[0]-dx*t,pz-a[1]-dz*t); }
-function pathD(x,z){ let d=1e9; for(let i=0;i<PATH.length-1;i++) d=Math.min(d,segD(x,z,PATH[i],PATH[i+1])); return d; }
+// 森の獣道（本道から分かれて屋敷の西・東・北の破れ目へ回り込む）
+const TRAILS=[PATH,
+  [[-9,146],[-26,132],[-44,112],[-58,84],[-62,52],[-58,22],[-52,-2],[-44,-20]],
+  [[9,100],[28,92],[46,74],[58,46],[60,18],[52,2],[44,0]],
+  [[-58,22],[-64,-14],[-56,-48],[-36,-62],[-12,-64],[0,-56],[0,-48]],
+  [[0,-56],[18,-66],[44,-60],[60,-36],[62,-6],[60,18]],
+  [[-4,160],[-34,170],[-62,150],[-72,112],[-58,84]],
+  [[6,116],[34,128],[62,110],[66,72],[58,46]]];
+function pathD(x,z){ let d=1e9; for(const T of TRAILS) for(let i=0;i<T.length-1;i++) d=Math.min(d,segD(x,z,T[i],T[i+1])); return d; }
 const ESTATE={x0:-42,x1:42,z0:-46,z1:46};
 function terrH(x,z){ if(inR(ESTATE,x,z,4)) return 0; const n=fbm(x*.035+3,z*.035+7,3)*2.2-.6; const pd=pathD(x,z); const k=Math.min(1,Math.max(0,(pd-2)/6)); const e=Math.min(1,Math.max(0,(Math.max(ESTATE.x0-x,x-ESTATE.x1,ESTATE.z0-z,z-ESTATE.z1)-4)/10)); return n*k*e; }
 
@@ -1000,10 +1008,18 @@ chandelier(0,7.6,15.6,.5,6); portrait(-5.82,6.2,15.85,PI/2,.8,1.0,2,1); portrait
    ============================================================ */
 // 鉄柵
 { const E=ESTATE, sp=.28; const bar=new THREE.BoxGeometry(.035,1,.035), tip=new THREE.ConeGeometry(.035,.16,4);
-  const run=(ax,c,a0,a1)=>{ for(let a=a0;a<=a1;a+=sp){ if(ax==='x'&&Math.abs(c-E.z1)<.1&&Math.abs(a)<2.6) continue; const x=ax==='x'?a:c, z=ax==='x'?c:a; const lean=(fbm(a*.1,c*.1,2)-.5)*.16; bk('iron').add(bar,TM(x,1.1,z,0,1,2.2,1,ax==='x'?0:lean,ax==='x'?lean:0)); bk('iron').add(tip,TM(x,2.28,z)); }
-    for(const y of [.4,1.9]){ if(ax==='x'){ for(const [p0,p1] of (Math.abs(c-E.z1)<.1?[[a0,-2.6],[2.6,a1]]:[[a0,a1]])) boxAt('iron',p0,p1,y,y+.05,c-.03,c+.03); } else boxAt('iron',c-.03,c+.03,y,y+.05,a0,a1); }
-    if(ax==='x'){ if(Math.abs(c-E.z1)<.1){ collide(a0,-2.6,c-.1,c+.1); collide(2.6,a1,c-.1,c+.1); } else collide(a0,a1,c-.1,c+.1); } else collide(c-.1,c+.1,a0,a1); };
-  run('x',E.z1,E.x0,E.x1); run('x',E.z0,E.x0,E.x1); run('z',E.x0,E.z0,E.z1); run('z',E.x1,E.z0,E.z1);
+  // 柵の切れ目：南＝正門、北＝裏門、西＝墓地の破れ目、東＝裏庭の破れ目
+  const GAPS={S:[[-2.6,2.6]],N:[[-2.3,2.3]],W:[[-22.5,-17.5]],E:[[-2.5,2.5]]};
+  const run=(ax,c,a0,a1,side)=>{ const gp=GAPS[side]; const inGap=a=>gp.some(([g0,g1])=>a>g0&&a<g1);
+    for(let a=a0;a<=a1;a+=sp){ if(inGap(a)) continue; const x=ax==='x'?a:c, z=ax==='x'?c:a; const lean=(fbm(a*.1,c*.1,2)-.5)*.16+(gp.some(([g0,g1])=>a>g0-1.5&&a<g1+1.5)&&side!=='S'?R(-.5,.5):0); bk('iron').add(bar,TM(x,1.1,z,0,1,2.2,1,ax==='x'?0:lean,ax==='x'?lean:0)); bk('iron').add(tip,TM(x+(ax==='x'?lean*2.2:0),2.28,z+(ax==='x'?0:lean*2.2))); }
+    let segs=[[a0,a1]]; for(const [g0,g1] of gp){ segs=segs.flatMap(([s0,s1])=>g1<=s0||g0>=s1?[[s0,s1]]:[[s0,g0],[g1,s1]].filter(([u,v])=>v-u>.1)); }
+    for(const [s0,s1] of segs){ for(const y of [.4,1.9]){ if(ax==='x') boxAt('iron',s0,s1,y,y+.05,c-.03,c+.03); else boxAt('iron',c-.03,c+.03,y,y+.05,s0,s1); } if(ax==='x') collide(s0,s1,c-.1,c+.1); else collide(c-.1,c+.1,s0,s1); } };
+  run('x',E.z1,E.x0,E.x1,'S'); run('x',E.z0,E.x0,E.x1,'N'); run('z',E.x0,E.z0,E.z1,'W'); run('z',E.x1,E.z0,E.z1,'E');
+  // 裏門（北）：崩れかけた門柱と倒れた門扉
+  for(const s of [-1,1]){ solidBox('stoneD',s*2.9-.4,s*2.9+.4,0,2.8,E.z0-.4,E.z0+.4); }
+  { const g=new THREE.Group(); for(let a=.15;a<2.2;a+=.22){ const b=new THREE.Mesh(bar,M.iron); b.scale.y=2.3; b.position.set(a,1.2,0); g.add(b); } for(const y of [.3,1.3,2.2]){ const r=new THREE.Mesh(new THREE.BoxGeometry(2.2,.05,.05),M.iron); r.position.set(1.1,y,0); g.add(r); } g.position.set(-2.5,.05,E.z0-.8); g.rotation.set(-PI/2+.08,.3,0); scene.add(g); }
+  // 破れ目の目印（倒れた柵）
+  for(const [x,z,ry] of [[E.x0-1.2,-20,PI/2],[E.x1+1.2,0,-PI/2]]){ const g=new THREE.Group(); for(let a=-2;a<2;a+=.28){ const b=new THREE.Mesh(bar,M.iron); b.scale.y=2.2; b.position.set(a,0,1.1); b.rotation.x=PI/2; g.add(b); } g.position.set(x,.06,z); g.rotation.y=ry; scene.add(g); }
   // 門柱
   for(const s of [-1,1]){ const x=s*3.1; solidBox('stone',x-.6,x+.6,0,3.6,E.z1-.6,E.z1+.6); boxAt('stoneD',x-.75,x+.75,3.6,3.85,E.z1-.75,E.z1+.75);
     const gar=new THREE.Group(); const b=new THREE.Mesh(new THREE.SphereGeometry(.4,10,8),M.stoneD); b.scale.set(1,.8,1.2); b.position.y=.3; gar.add(b); const h=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M.stoneD); h.position.set(0,.65,.35); gar.add(h); for(const w of [-1,1]){ const wg=new THREE.Mesh(new THREE.ConeGeometry(.3,.9,3),M.stoneD); wg.position.set(w*.4,.6,-.1); wg.rotation.z=-w*.9; gar.add(wg); } for(const e of [-1,1]){ const ey=new THREE.Mesh(new THREE.SphereGeometry(.03,6,4),new THREE.MeshBasicMaterial({color:'#ff3020'})); ey.position.set(e*.08,.7,.55); ey.userData.dyn=1; GN.add(ey); ANIM.push(()=>{ ey.position.copy(gar.localToWorld(V3(e*.08,.7,.55))); }); }
@@ -1050,7 +1066,7 @@ function deadTree(x,z,s){ const y0=terrH(x,z)-.2, H=R(8,15)*s, r=R(.22,.5)*s, lx
       B.add(new THREE.CylinderGeometry(.01,r*.1,L2,4,1,true),new THREE.Matrix4().compose(V3(ex+d2.x*L2/2,ey+d2.y*L2/2,ez+d2.z*L2/2),q2,V3(1,1,1))); } }
   collide(x-r*.8,x+r*.8,z-r*.8,z+r*.8); TREES.push([x,z]); }
 { let n=0,tries=0; while(n<230&&tries<5000){ tries++; const x=R(-88,88), z=R(-88,198); if(inR(ESTATE,x,z,3)) continue; if(pathD(x,z)<3.2) continue; if(TREES.some(t=>Math.abs(t[0]-x)<2.6&&Math.abs(t[1]-z)<2.6)) continue; deadTree(x,z,pathD(x,z)<10?R(.8,1.1):R(.9,1.3)); n++; }
-  for(let i=0;i<14;i++){ const x=R(-38,38), z=R(-44,-14); if(Math.abs(x-30)<4&&Math.abs(z+28)<4) continue; if(x<-24) continue; deadTree(x,z,R(.6,.9)); }
+  for(let i=0;i<14;i++){ const x=R(-38,38), z=R(-44,-14); if(Math.abs(x-30)<4&&Math.abs(z+28)<4) continue; if(x<-24) continue; if(Math.abs(x)<5&&z<-36) continue; if(x>30&&Math.abs(z)<5) continue; deadTree(x,z,R(.6,.9)); }
   // 倒木・岩・切り株
   for(let i=0;i<40;i++){ const x=R(-85,85), z=R(-85,195); if(inR(ESTATE,x,z,3)||pathD(x,z)<3) continue; const y=terrH(x,z); if(rnd()<.5){ const L=R(3,7); bk('bark').add(new THREE.CylinderGeometry(R(.2,.4),R(.3,.5),L,7),TM(x,y+.25,z,R(0,6),1,1,1,0,PI/2)); collide(x-1,x+1,z-1,z+1,y,y+.6); }
     else { const s=R(.4,1.2); bk('stoneD').add(new THREE.DodecahedronGeometry(s,0),TM(x,y+s*.3,z,R(0,6),1,R(.5,.9),1)); collide(x-s*.8,x+s*.8,z-s*.8,z+s*.8,y,y+s); } }
@@ -1208,7 +1224,7 @@ function drawLevel(lv){ const zoom=lv==='out'?1:1; const B=lv==='out'?MB:{x0:-24
   const X=x=>(x-B.x0)*sx, Z=z=>(z-B.z0)*sx;
   g.fillStyle='#14110f'; g.fillRect(0,0,W,H);
   if(lv==='out'){ g.fillStyle='#1d1f18'; g.fillRect(X(ESTATE.x0),Z(ESTATE.z0),(ESTATE.x1-ESTATE.x0)*sx,(ESTATE.z1-ESTATE.z0)*sx); g.strokeStyle='#4a4a4a'; g.lineWidth=1.5; g.strokeRect(X(ESTATE.x0),Z(ESTATE.z0),(ESTATE.x1-ESTATE.x0)*sx,(ESTATE.z1-ESTATE.z0)*sx);
-    g.strokeStyle='#5a4a34'; g.lineWidth=3.2*sx; g.lineCap='round'; g.beginPath(); PATH.forEach((p,i)=>i?g.lineTo(X(p[0]),Z(p[1])):g.moveTo(X(p[0]),Z(p[1]))); g.stroke();
+    g.strokeStyle='#5a4a34'; g.lineWidth=3.2*sx; g.lineCap='round'; TRAILS.forEach((T,k)=>{ g.lineWidth=(k?2.2:3.2)*sx; g.strokeStyle=k?'#4a3e2e':'#5a4a34'; g.beginPath(); T.forEach((p,i)=>i?g.lineTo(X(p[0]),Z(p[1])):g.moveTo(X(p[0]),Z(p[1]))); g.stroke(); }); g.strokeStyle='#14110f'; g.lineWidth=2.5; for(const [x0,z0,x1,z1] of [[-2.6,46,2.6,46],[-2.3,-46,2.3,-46],[-42,-22.5,-42,-17.5],[42,-2.5,42,2.5]]){ g.beginPath(); g.moveTo(X(x0),Z(z0)); g.lineTo(X(x1),Z(z1)); g.stroke(); }
     g.fillStyle='#0c0d0a'; for(const t of TREES){ g.beginPath(); g.arc(X(t[0]),Z(t[1]),1.6*sx,0,6.283); g.fill(); }
     g.fillStyle='#3a3230'; g.fillRect(X(-20),Z(-10),40*sx,40*sx); g.beginPath(); g.arc(X(21.5),Z(31.5),3*sx,0,6.283); g.fill();
     g.fillStyle='#2a2a2a'; for(let i=0;i<0;i++); }
