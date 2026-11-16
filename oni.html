@@ -172,9 +172,14 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 .plist small{color:var(--mute);font-size:11px;margin-left:auto}.plist em{font-style:normal;font-size:10px;color:var(--shu2)}
 .sets{display:flex;gap:10px}.sets label{flex:1;display:grid;gap:4px;font-size:12px;color:var(--mute)}
 .lmsg{font-size:14px;line-height:1.7}
-#oniHud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 70px);left:16px;z-index:6;pointer-events:none;text-shadow:0 1px 8px #000}
+#oniHud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 92px);left:16px;z-index:6;pointer-events:none;text-shadow:0 1px 8px #000}
 #oniTime{font-family:var(--f-disp);font-weight:800;font-size:28px;letter-spacing:.05em}#oniTime.pre{color:var(--shu2);font-size:18px}
 #oniCount{font-size:12px;color:var(--mute)}
+#oniGoal{font-size:12px;margin-top:4px;max-width:58vw;line-height:1.5}#oniGoal.key{color:#bcd0ff;font-weight:700}
+#oniRescue{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:7;min-width:220px;height:60px;border-radius:16px;border:1px solid rgba(224,49,59,.8);background:rgba(90,8,14,.9);color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;-webkit-user-select:none;user-select:none;touch-action:none}
+body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
+#oniRescue b{font-size:14px}#oniRescue span{width:80%;height:6px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden}#oniRescue i{display:block;height:100%;width:0;background:#fff}
+#oniRescue.on{background:rgba(163,18,27,1);box-shadow:0 0 20px rgba(224,49,59,.8)}
 .bar{width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,.15);margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:#e8e0d0}
 #oniWax{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:6;text-align:center;font-family:var(--f-disp);text-shadow:0 2px 12px #000;pointer-events:none}
 #oniWax b{display:block;font-size:24px;color:#f0e6d2}#oniWax span{font-size:13px}
@@ -278,9 +283,10 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 
 <div id="oniRed"></div>
 <section id="oniL" hidden><div class="in"><h1>霧ノ森の<em>鬼ごっこ</em></h1><div class="sub">蝋人形館 · オンライン</div><div id="oniLbody"></div></div></section>
-<div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
+<div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniGoal"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
 <div id="oniWax" hidden><b>蝋人形にされた……</b><span>仲間にふれてもらうと動けるようになる</span><div class="bar"><i id="oniWaxBar"></i></div></div>
 <section id="oniEnd" hidden></section>
+<button id="oniRescue" hidden><b>長押しで助ける</b><span><i></i></span></button>
 <section id="oniDrop" hidden></section>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -513,7 +519,8 @@ const TRAILS=[PATH,
   [[-58,22],[-64,-14],[-56,-48],[-36,-62],[-12,-64],[0,-56],[0,-48]],
   [[0,-56],[18,-66],[44,-60],[60,-36],[62,-6],[60,18]],
   [[-4,160],[-34,170],[-62,150],[-72,112],[-58,84]],
-  [[6,116],[34,128],[62,110],[66,72],[58,46]]];
+  [[6,116],[34,128],[62,110],[66,72],[58,46]],
+  [[0,-56],[3,-66],[0,-80]]];
 function pathD(x,z){ let d=1e9; for(const T of TRAILS) for(let i=0;i<T.length-1;i++) d=Math.min(d,segD(x,z,T[i],T[i+1])); return d; }
 const ESTATE={x0:-42,x1:42,z0:-46,z1:46};
 function terrH(x,z){ if(inR(ESTATE,x,z,4)) return 0; const n=fbm(x*.035+3,z*.035+7,3)*2.2-.6; const pd=pathD(x,z); const k=Math.min(1,Math.max(0,(pd-2)/6)); const e=Math.min(1,Math.max(0,(Math.max(ESTATE.x0-x,x-ESTATE.x1,ESTATE.z0-z,z-ESTATE.z1)-4)/10)); return n*k*e; }
@@ -1380,7 +1387,7 @@ $('shotX').onclick=()=>{ $('shot').hidden=true; };
 /* ============================================================
    メインループ
    ============================================================ */
-let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, BOUNDS=null;
+let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null;
 let START=true, last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
 const tmpV=new THREE.Vector3(), fwd=new THREE.Vector3();
 function step(dt,t){
@@ -1389,7 +1396,7 @@ function step(dt,t){
   P.yaw-=IN.lx*dt*[1.4,2.2,3.2][sens]; P.pitch=Math.max(-1.3,Math.min(1.3,P.pitch-IN.ly*dt*[1,1.6,2.4][sens]));
   if(HIDDEN){ mx=0; mz=0; const h=HIDDEN.h; let d=((P.yaw-h.yaw+PI)%(2*PI)+2*PI)%(2*PI)-PI; d=Math.max(-h.yr,Math.min(h.yr,d)); P.yaw=h.yaw+d; P.pitch=Math.max(h.pmin,Math.min(h.pmax,P.pitch)); }
   if(LOCKMOVE&&LOCKMOVE()){ mx=0; mz=0; }
-  const sp=(IN.run?RUNSPD():2.1)*Math.min(1,Math.hypot(mx,mz)); let moving=false;
+  const sp=(IN.run?RUNSPD():WALKSPD())*Math.min(1,Math.hypot(mx,mz)); let moving=false;
   if(sp>.01){ const a=Math.atan2(mx,mz)+P.yaw; const vx=Math.sin(a)*sp*dt, vz=Math.cos(a)*sp*dt; const n=Math.ceil(Math.hypot(vx,vz)/.2);
     for(let i=0;i<n;i++){ const nx=P.x+vx/n, nz=P.z+vz/n;
       const tryMove=(x,z)=>{ if(blocked(x,z,P.y)) return false; const s=surfaceAt(x,z,P.y); if(s<P.y-.62&&s>-1e8&&false) return false; if(s<-1e8) return false; return true; };
@@ -1648,7 +1655,8 @@ return {DEMONS,RUNNERS};
    ============================================================ */
 const ONI=(function(){
 const PEER_PREFIX='kirinomori-oni-v1-', NET_HZ=10;
-const GB={x0:-78,x1:78,z0:-78,z1:112}; // 遊べる範囲
+const GB={x0:-80,x1:80,z0:-86,z1:198};
+const EXIT={x:0,y:0,z:-80,r:3.5}; const OSCALE=1.2; // 鬼は1.2倍速 // 遊べる範囲
 const qs=new URLSearchParams(location.search);
 const el=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const net={mode:null,peer:null,conns:new Map(),seen:new Map(),host:null,myId:0,code:'',sendT:0,solo:false,nextId:1};
@@ -1667,14 +1675,14 @@ function makeAv(role,ch){ const src=role==='oni'?CH.DEMONS[ch%CH.DEMONS.length]:
 function nameTag(text,col){ const c=makeCanvas(256,64),x=c.getContext('2d'); x.font='bold 30px "Zen Kaku Gothic New",sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.lineWidth=6; x.strokeStyle='rgba(0,0,0,.8)'; x.strokeText(text,128,32); x.fillStyle=col; x.fillText(text,128,32);
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:toTex(c,true,false),depthTest:false,transparent:true})); s.scale.set(1.2,.3,1); s.renderOrder=10; return s; }
 function avFor(p){ let A=AV.get(p.id); if(A&&(A.role!==p.role||A.ch!==p.ch)){ scene.remove(A.av.g); AV.delete(p.id); A=null; }
-  if(!A){ const av=makeAv(p.role,p.ch); const tag=nameTag(p.n+(p.ai?'':''),p.role==='oni'?'#ff7070':'#e8f0ff'); tag.position.y=2.15; av.g.add(tag); A={av,tag,role:p.role,ch:p.ch,x:p.x,y:p.y,z:p.z,yaw:p.yaw,wax:false}; AV.set(p.id,A); }
+  if(!A){ const av=makeAv(p.role,p.ch); var km=null; if(p.role==='run'){ km=keyMesh(); km.scale.setScalar(.7); km.position.set(.3,1.0,-.15); km.visible=false; av.g.add(km); } const tag=nameTag(p.n+(p.ai?'':''),p.role==='oni'?'#ff7070':'#e8f0ff'); tag.position.y=2.15; av.g.add(tag); A={av,tag,role:p.role,ch:p.ch,x:p.x,y:p.y,z:p.z,yaw:p.yaw,wax:false,keyM:km}; AV.set(p.id,A); }
   return A; }
 
 /* ---------- 歩ける網（AI鬼の道案内） ---------- */
 let NAV=null;
 function buildNav(){ const st=.8, key=(i,j,y)=>i+','+j+','+Math.round(y*2); const nodes=new Map(), q=[];
   const add=(x,y,z)=>{ const i=Math.round(x/st),j=Math.round(z/st),k=key(i,j,y); if(nodes.has(k)) return null; const n={k,x:i*st,z:j*st,y,nb:[]}; nodes.set(k,n); q.push(n); return n; };
-  for(const s of [[0,0,40],[0,0,24],[13,-4,8],[-13,H1,20],[0,0,-25],[0,0,90]]) add(s[0],s[1],s[2]);
+  for(const s of [[0,0,40],[0,0,24],[13,-4,8],[-13,H1,20],[0,0,-25],[0,0,90],[0,0,186],[0,0,-78]]) add(s[0],s[1],s[2]);
   while(q.length){ const n=q.shift(); for(const [dx,dz] of [[st,0],[-st,0],[0,st],[0,-st]]){ const nx=n.x+dx,nz=n.z+dz; if(nx<GB.x0+3||nx>GB.x1-3||nz<GB.z0+3||nz>GB.z1-3) continue;
       let ok=true; for(let k=1;k<=3;k++){ if(blocked(n.x+dx*k/3,n.z+dz*k/3,n.y)){ ok=false; break; } } if(!ok) continue; const s=surfaceAt(nx,nz,n.y); if(s<-1e8||s<n.y-1.2) continue;
       const i=Math.round(nx/st),j=Math.round(nz/st), kk=key(i,j,s); let m=nodes.get(kk); if(!m) m=add(nx,s,nz); if(m) { n.nb.push(m); } else { const mm=nodes.get(kk); if(mm&&!n.nb.includes(mm)) n.nb.push(mm); } } }
@@ -1691,20 +1699,22 @@ function slabBetween(x,z,y0,y1){ const lo=Math.min(y0,y1),hi=Math.max(y0,y1); fo
 function sees(a,b){ const dx=b.x-a.x,dz=b.z-a.z,dy=b.y-a.y, d=Math.hypot(dx,dz); if(d>17||Math.abs(dy)>1.8) return false; const n=Math.ceil(d/.5); for(let i=1;i<n;i++){ const t=i/n; if(pointBlocked(a.x+dx*t,a.y+1.2+dy*t,a.z+dz*t)) return false; } return true; }
 
 /* ---------- 主：ゲーム進行 ---------- */
-const OSPD=[5.0,4.6,4.4,5.2,5.4,4.3]; // 鬼ごとの全力
+const OSPD=[5.0,4.6,4.4,5.2,5.4,4.3].map(v=>v*OSCALE); // 鬼ごとの全力
+const KEYSPOTS=[[-16,H1,18,'老人の書斎'],[-16,H1,-3,'開かずの一室'],[16,H1,-6,'肖像画の間'],[8,H1,27.5,'衣装部屋'],[9.5,0,-6,'晩餐の間'],[14,0,15.2,'蝋の工房'],[-15,0,-8,'蝋人形の回廊'],[3.5,0,-8,'儀式の間'],[16,-4,-6,'地下の保管庫'],[8.6,-4,13.5,'地下の保管庫']];
 function newGame(){ const pl=lobby.map((L,i)=>({id:L.id,n:L.n,role:L.role,ch:L.ch,ai:false}));
   const humanOni=pl.filter(p=>p.role==='oni').length, runners=pl.filter(p=>p.role==='run').length;
   let ai=SET.ai==='auto'?(humanOni?0:Math.max(1,Math.ceil(runners/3))):+SET.ai; const used=new Set(pl.filter(p=>p.role==='oni').map(p=>p.ch));
   for(let k=0;k<ai;k++){ let ch=k%6; for(let c=0;c<6;c++){ if(!used.has((k*2+c)%6)){ ch=(k*2+c)%6; break; } } used.add(ch); pl.push({id:1000+k,n:CH.DEMONS[ch].name,role:'oni',ch,ai:true}); }
   if(!pl.some(p=>p.role==='run')) { pl.forEach(p=>{}); }
-  const RS=[[0,40],[-4,38],[4,38],[-8,40],[8,40],[-2,43],[2,43],[0,36]], OS=[[0,2],[-3,0],[3,0],[0,-4],[-12,8],[12,8]]; let ri=0,oi=0;
-  pl.forEach(p=>{ const s=p.role==='run'?RS[ri++%RS.length]:OS[oi++%OS.length]; p.x=s[0]; p.z=s[1]; p.y=0; p.yaw=p.role==='run'?0:PI; p.mv=0; p.hid=-1; p.st='free'; p.res=0; p.spd=p.role==='oni'?OSPD[p.ch]:4.6;
+  const RS=[[0,188],[-2,186],[2,186],[-1,184],[1,190],[-3,189],[3,189],[0,185]], OS=[[0,2],[-3,0],[3,0],[0,-4],[-12,8],[12,8]]; let ri=0,oi=0;
+  pl.forEach(p=>{ const s=p.role==='run'?RS[ri++%RS.length]:OS[oi++%OS.length]; p.x=s[0]; p.z=s[1]; p.y=0; p.yaw=p.role==='run'?0:PI; p.mv=0; p.hid=-1; p.st='free'; p.res=0; p.key=-1; p.rs=-1; p.spd=p.role==='oni'?OSPD[p.ch]:4.6;
     if(p.ai){ p.mode='wait'; p.goal=null; p.D=null; p.reT=0; p.last=null; p.checks=[]; p.cool=0; } });
-  G={pl,t:SET.min*60,pre:10,over:false,evs:[]};
+  const nRun=Math.max(1,pl.filter(p=>p.role==='run').length); const idx=KEYSPOTS.map((k,i)=>i).sort(()=>Math.random()-.5).slice(0,Math.min(KEYSPOTS.length,nRun+1));
+  G={pl,t:SET.min*60,pre:10,over:false,evs:[],keys:idx.map(i=>({i,x:KEYSPOTS[i][0],y:KEYSPOTS[i][1],z:KEYSPOTS[i][2],by:-1}))};
   if(G.pl.some(p=>p.ai)&&!NAV) buildNav();
   return G; }
 function hostEvent(m){ broadcast({t:'ev',m}); onEv(m); }
-function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free') me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; }
+function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free'){ me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; me0.rs=rescueTarget(); } }
   if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent('鬼が動き出した！'); }
   else G.t-=dt;
   // AI鬼
@@ -1712,32 +1722,37 @@ function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.
   if(G.pre<=0){
     const oni=G.pl.filter(p=>p.role==='oni'), run=G.pl.filter(p=>p.role==='run');
     G.pl.forEach(p=>{ if(p.away) p.awayT=(p.awayT||0)+dt; });
-    for(const r of run){ if(r.st!=='free'||r.hid>=0||r.away) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&Math.abs(o.y-r.y)<1.2){ catchRun(r,o); break; } } }
-    // 仲間を助ける（蝋になった仲間に2秒ふれる）
-    for(const w of run){ if(w.st!=='wax') continue; let near=null; for(const r of run){ if(r.st==='free'&&r.hid<0&&!r.away&&Math.hypot(r.x-w.x,r.z-w.z)<1.3&&Math.abs(r.y-w.y)<1.2){ near=r; break; } }
-      if(near){ w.res+=dt; if(w.res>=2){ w.st='free'; w.res=0; hostEvent(near.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else w.res=Math.max(0,w.res-dt*.5); }
-    const free=run.filter(r=>r.st==='free').length;
-    if(run.length&&free===0) endGame('oni'); else if(G.t<=0) endGame('run'); }
+    for(const r of run){ if(r.st!=='free'||r.hid>=0||r.away) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&Math.abs(o.y-r.y)<1.2){ catchRun(r,o); break; } } } // 隠れている者は絶対に捕まらない
+    // 仲間を助ける：蝋になった仲間のそばで3秒長押し。手を離すと0から
+    for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<1.6&&Math.abs(r.y-w.y)<1.2);
+      if(h){ w.res+=dt; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else w.res=0; }
+    // 銀の鍵を拾う（ふれるだけ）
+    for(const k of G.keys){ if(k.by>=0) continue; const r=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.key<0&&Math.hypot(r.x-k.x,r.z-k.z)<1.1&&Math.abs(r.y-k.y)<1.3); if(r){ k.by=r.id; r.key=G.keys.indexOf(k); hostEvent(r.n+' が「'+KEYSPOTS[k.i][3]+'」で銀の鍵を手に入れた！'); } }
+    // 鍵を持って森の出口へ
+    for(const r of run){ if(r.st==='free'&&r.key>=0&&Math.hypot(r.x-EXIT.x,r.z-EXIT.z)<EXIT.r){ r.st='esc'; r.hid=-1; hostEvent(r.n+' が銀の鍵で森の出口を開け、霧ノ森から逃げのびた！'); } }
+    const live=run.filter(r=>!r.away||r.st!=='free'), anyEsc=run.some(r=>r.st==='esc'), left=live.filter(r=>r.st==='free').length;
+    if(run.length&&left===0) endGame(anyEsc?'run':'oni'); else if(G.t<=0) endGame(anyEsc?'run':'oni'); }
   }
-function catchRun(r,o){ r.st='wax'; r.hid=-1; r.res=0; hostEvent(o.n+' が '+r.n+' を捕まえた——生きたまま蝋人形に……'); if(r.id===net.myId) forceUnhide(); else sendTo(r.id,{t:'caught'}); }
-function hostSearch(o,spot){ const h=HIDES[spot]; if(!h) return; const r=G.pl.find(p=>p.role==='run'&&p.hid===spot&&p.st==='free'); if(r){ r.x=h.ex; r.z=h.ez; r.y=h.y; catchRun(r,o); hostEvent('「'+h.name+'」の中から '+r.n+' が引きずり出された！'); } else if(!o.ai) sendTo(o.id,{t:'ev',m:'「'+h.name+'」には誰もいない……'}); }
+function catchRun(r,o){ if(r.key>=0){ const k=G.keys[r.key]; if(k){ k.by=-1; } r.key=-1; hostEvent('落とした銀の鍵は、元の場所に戻った……'); } r.st='wax'; r.hid=-1; r.res=0; hostEvent(o.n+' が '+r.n+' を捕まえた——生きたまま蝋人形に……'); if(r.id===net.myId) forceUnhide(); else sendTo(r.id,{t:'caught'}); }
+function hostSearch(){}
 function endGame(win){ if(G.over) return; G.over=true; const res={t:'end',win,pl:G.pl.map(p=>({n:p.n,role:p.role,st:p.st,ai:p.ai}))}; G.endMsg=res; broadcast(res); onEnd(res); }
 // AIの動き
 function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
   const here={x:p.x,y:p.y,z:p.z};
   // 見える逃げ手
   let tgt=null,td=1e9; for(const r of G.pl){ if(r.role!=='run'||r.st!=='free'||r.away) continue; if(r.hid>=0){ if(p.mode==='chase'&&p.tid===r.id&&Math.hypot(r.x-p.x,r.z-p.z)<9){ // 目の前で隠れた
-        p.mode='search'; p.checks=[r.hid]; p.last={x:HIDES[r.hid].ex,y:HIDES[r.hid].y,z:HIDES[r.hid].ez}; p.reT=0; } continue; }
+        p.mode='lurk'; p.lurkT=R(8,14); p.last={x:HIDES[r.hid].ex,y:HIDES[r.hid].y,z:HIDES[r.hid].ez}; p.reT=0; } continue; }
     if(sees(here,r)){ const d=Math.hypot(r.x-p.x,r.z-p.z); if(d<td){ td=d; tgt=r; } } }
   if(tgt){ p.mode='chase'; p.tid=tgt.id; p.last={x:tgt.x,y:tgt.y,z:tgt.z}; }
-  else if(p.mode==='chase'){ p.mode='search'; p.reT=0; p.checks=HIDES.map((h,i)=>i).filter(i=>Math.hypot(HIDES[i].ex-p.last.x,HIDES[i].ez-p.last.z)<9&&Math.abs(HIDES[i].y-p.last.y)<1.5).slice(0,3); }
+  else if(p.mode==='chase'){ p.mode='search'; p.reT=0; p.checks=[]; }
   // 目的地
   let goal=null, spd=2.3;
   if(p.mode==='chase'){ goal=p.last; spd=p.spd*.95; }
-  else if(p.mode==='search'){ spd=3.4; if(p.checks.length){ const h=HIDES[p.checks[0]]; goal={x:h.ex,y:h.y,z:h.ez}; if(Math.hypot(h.ex-p.x,h.ez-p.z)<1.2&&Math.abs(h.y-p.y)<1.2&&p.cool<=0){ p.cool=1.2; hostSearch(p,p.checks.shift()); } }
-    else { goal=p.last; if(!p.last||Math.hypot(p.last.x-p.x,p.last.z-p.z)<1.5){ p.mode='patrol'; p.goal=null; } } }
-  if(p.mode==='patrol'||p.mode==='wait'){ p.mode='patrol'; if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5){ if(Math.random()<.45){ const i=Math.floor(Math.random()*HIDES.length), h=HIDES[i]; p.goal={x:h.ex,y:h.y,z:h.ez,spot:i}; } else { const n=NAV.arr[Math.floor(Math.random()*NAV.arr.length)]; p.goal={x:n.x,y:n.y,z:n.z}; } p.reT=0; }
-    goal=p.goal; spd=2.4; if(p.goal&&p.goal.spot!=null&&Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.3&&p.cool<=0){ p.cool=2; hostSearch(p,p.goal.spot); p.goal=null; } }
+  else if(p.mode==='lurk'){ goal=p.last; spd=2.4*OSCALE; p.lurkT-=dt; if(p.lurkT<=0){ p.mode='patrol'; p.goal=null; } }
+  else if(p.mode==='search'){ spd=3.4*OSCALE; { goal=p.last; if(!p.last||Math.hypot(p.last.x-p.x,p.last.z-p.z)<1.5){ p.mode='patrol'; p.goal=null; } } }
+  if(p.mode==='patrol'||p.mode==='wait'){ // 鍵を持つ者を優先して追う
+    const kr=G.pl.find(r=>r.role==='run'&&r.st==='free'&&r.key>=0&&!r.away&&r.hid<0&&Math.hypot(r.x-p.x,r.z-p.z)<30); if(kr&&Math.random()<.02){ p.goal={x:kr.x,y:kr.y,z:kr.z}; } p.mode='patrol'; if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5){ const rr=Math.random(); if(rr<.35){ const i=Math.floor(Math.random()*HIDES.length), h=HIDES[i]; p.goal={x:h.ex,y:h.y,z:h.ez}; } else if(rr<.6){ const k=G.keys[Math.floor(Math.random()*G.keys.length)]; p.goal=Math.random()<.5&&k?{x:k.x,y:k.y,z:k.z}:{x:EXIT.x+R(-6,6),y:0,z:EXIT.z+R(4,12)}; } else { const n=NAV.arr[Math.floor(Math.random()*NAV.arr.length)]; p.goal={x:n.x,y:n.y,z:n.z}; } p.reT=0; }
+    goal=p.goal; spd=2.4*OSCALE; }
   if(!goal) return;
   // 直接見えているなら直進、そうでなければ網をたどる
   let dirx,dirz; const direct=p.mode==='chase'&&tgt;
@@ -1816,7 +1831,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden||leaving) 
   if(net.peer&&net.peer.disconnected&&!net.peer.destroyed){ try{ net.peer.reconnect(); }catch(e){} }
   if(net.mode==='client'&&everJoined&&(!net.host||!net.host.open||Date.now()-lastRx>5000)&&!retryT){ retryN=0; dropped(); } });
 function hostMsg(id,m){ if(m.t==='ping') return; if(m.t==='pick'){ const l=lobby.find(l=>l.id===id); if(l){ l.role=m.role==='oni'?'oni':'run'; l.ch=+m.ch||0; } pushLobby(); }
-  else if(m.t==='st'&&G){ const p=G.pl.find(p=>p.id===id); if(!p) return; if(p.away){ p.away=false; p.awayT=0; } if(p.st==='wax'){ return; } p.x=m.x; p.y=m.y; p.z=m.z; p.yaw=m.yaw; p.mv=m.mv; p.hid=m.hid; }
+  else if(m.t==='st'&&G){ const p=G.pl.find(p=>p.id===id); if(!p) return; if(p.away){ p.away=false; p.awayT=0; } if(p.st==='wax'||p.st==='esc'){ return; } p.x=m.x; p.y=m.y; p.z=m.z; p.yaw=m.yaw; p.mv=m.mv; p.hid=m.hid; p.rs=m.rs==null?-1:m.rs; }
   else if(m.t==='search'&&G&&G.pre<=0){ const p=G.pl.find(p=>p.id===id); if(p&&p.role==='oni') hostSearch(p,m.spot); } }
 function pushLobby(){ const m={t:'lobby',list:lobby,code:net.code,set:SET}; broadcast(m); if(!inGame) showLobby(); }
 function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
@@ -1829,7 +1844,7 @@ function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
   else if(m.t==='end'){ onEnd(m); }
   else if(m.t==='back'){ ended=false; inGame=false; el('oniEnd').hidden=true; teardown(); GAMEMODE=false; START=true; showLobby(); }
   else if(m.t==='bye'){ leaving=true; dropUI(0); try{ localStorage.removeItem('oni_last'); }catch(e){} lobbyMsg('主が部屋を閉じました'); } }
-function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0])}; }
+function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0,p.key>=0?1:0,p.st==='esc'?1:0]),k:G.keys.map(k=>[k.x,k.y,k.z,k.by])}; }
 
 /* ---------- 画面（タイトル・控え室） ---------- */
 function lobbyMsg(s){ const L=el('oniL'); L.hidden=false; el('oniLbody').innerHTML=`<p class="lmsg">${esc(s)}</p><button class="o2" id="oniBack">タイトルへ</button>`; el('oniBack').onclick=()=>location.reload(); }
@@ -1875,23 +1890,44 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
   teardown(); pl.forEach(p=>{ if(p.id!==net.myId||true) avFor(p); });
-  if(!isTouch) setPad(0); else setPad(1);
+  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; window._escShown=0; el('fudaN').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
   if(resume){ say('','部屋に戻りました。続きから！',3.5); return; }
-  say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。逃げる者を捕まえ、隠れ場所を「調べる」で暴け。':'鬼が動き出すまで10秒。館や森に散らばって隠れよう。捕まった仲間には2秒ふれると助けられる。',7); }
+  say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
 function onEv(m){ say('',m,4.5); }
 function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
-  const iWin=(r.win==='oni')===(myRole==='oni'); const surv=r.pl.filter(p=>p.role==='run'&&p.st==='free').map(p=>p.n);
-  E.innerHTML=`<div class="box"><div class="k">${r.win==='oni'?'鬼の勝ち':'逃げ切り'}</div><h2>${iWin?'勝利':'敗北'}</h2><p>${r.win==='oni'?'迷い人はひとり残らず蝋人形にされ、回廊に新しい作品が並んだ……':'夜が明けた。'+esc(surv.join('、'))+' は霧ノ森から逃げのびた。'}</p>
-   <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='free'?'逃げ切り':'蝋人形'):''}</small></li>`).join('')}</ul>
+  const iWin=(r.win==='oni')===(myRole==='oni'); const surv=r.pl.filter(p=>p.role==='run'&&p.st==='esc').map(p=>p.n);
+  E.innerHTML=`<div class="box"><div class="k">${r.win==='oni'?'鬼の勝ち':'脱出成功'}</div><h2>${iWin?'勝利':'敗北'}</h2><p>${r.win==='oni'?'森の出口にたどり着いた者はいなかった。迷い人たちは蝋人形にされ、回廊に新しい作品が並んだ……':'銀の鍵を手に、'+esc(surv.join('、'))+' は森の出口から霧ノ森を逃げのびた。'}</p>
+   <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='esc'?'脱出':p.st==='wax'?'蝋人形':'森の中'):''}</small></li>`).join('')}</ul>
    ${net.mode==='host'?'<button class="o1" id="oniAgain">控え室へ（同じ仲間で）</button>':'<p class="note">主が次を選ぶのを待っています</p>'}<button class="o2" id="oniTitle">タイトルへ</button></div>`;
   if(el('oniAgain')) el('oniAgain').onclick=()=>{ G=null; V=null; broadcast({t:'back'}); onMsg({t:'back'}); };
   el('oniTitle').onclick=()=>{ leaving=true; if(net.mode==='host'&&!net.solo) broadcast({t:'bye'}); location.reload(); }; }
 let LOCKBY=false;
 function forceUnhide(){ if(HIDDEN) hideOut(); }
 
+/* ---------- 救出（長押し3秒） ---------- */
+let rescueHold=false, rescueId=-1;
+function nearWax(){ if(!V||myRole!=='run'||HIDDEN) return null; let best=null,bd=1.6; V.pl.forEach(q=>{ if(q[0]===net.myId||!q[7]) return; const d=Math.hypot(q[1]-P.x,q[3]-P.z); if(d<bd&&Math.abs(q[2]-P.y)<1.2){ bd=d; best=q; } }); return best; }
+function rescueTarget(){ if(!rescueHold) return -1; const w=nearWax(); if(!w||w[0]!==rescueId){ rescueHold=false; return -1; } return rescueId; }
+{ const b=el('oniRescue'); const down=e=>{ e.preventDefault(); const w=nearWax(); if(!w) return; rescueHold=true; rescueId=w[0]; b.classList.add('on'); }; const up=()=>{ rescueHold=false; b.classList.remove('on'); };
+  b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); b.addEventListener('pointerleave',up);
+  addEventListener('keydown',e=>{ if(e.code==='KeyR'&&!e.repeat&&GAMEMODE){ const w=nearWax(); if(w){ rescueHold=true; rescueId=w[0]; } } }); addEventListener('keyup',e=>{ if(e.code==='KeyR') rescueHold=false; }); }
+/* ---------- 銀の鍵と森の出口（見た目） ---------- */
+const KEYV=[]; const keyGeo=(()=>{ const g=new THREE.Group(); const m=new THREE.MeshStandardMaterial({color:'#dfe6f0',metalness:1,roughness:.2,emissive:'#6a7a9a',emissiveIntensity:.6});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.11,.025,8,16),m); ring.position.y=.2; g.add(ring); const sh=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.32,6),m); sh.position.y=-.05; g.add(sh); for(const y of [-.16,-.1]){ const t=new THREE.Mesh(new THREE.BoxGeometry(.08,.03,.025),m); t.position.set(.04,y,0); g.add(t); } return g; })();
+function keyMesh(){ const g=keyGeo.clone(); const gl=new THREE.Sprite(new THREE.SpriteMaterial({map:TX.glowB,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,opacity:.8})); gl.scale.set(1.2,1.2,1); g.add(gl); return g; }
+const EXITG=(()=>{ const g=new THREE.Group(); const st=new THREE.MeshStandardMaterial({map:TX.stoneD,roughness:.9});
+  for(const s of [-1,1]){ const c=new THREE.Mesh(new THREE.BoxGeometry(.8,4,.8),st); c.position.set(s*2.4,2,0); g.add(c); const L=new THREE.Sprite(new THREE.SpriteMaterial({map:TX.glowB,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false})); L.scale.set(2,2,1); L.position.set(s*2.4,4.4,0); g.add(L); }
+  const top=new THREE.Mesh(new THREE.BoxGeometry(6,.6,1),st); top.position.y=4.3; g.add(top);
+  const c=makeCanvas(256,64),x=c.getContext('2d'); x.fillStyle='#1a1410'; x.fillRect(0,0,256,64); x.fillStyle='#d8e4ff'; x.font='bold 36px "Shippori Mincho",serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('森の出口',128,34);
+  const sg=new THREE.Mesh(new THREE.PlaneGeometry(2.4,.6),new THREE.MeshBasicMaterial({map:toTex(c,true,false)})); sg.position.set(0,4.3,.51); g.add(sg);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(1.8,2.6,14,16,1,true),new THREE.MeshBasicMaterial({color:'#9ab4ff',transparent:true,opacity:.12,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending})); beam.position.y=7; g.add(beam);
+  const gate=new THREE.Mesh(new THREE.PlaneGeometry(4,4),new THREE.MeshBasicMaterial({color:'#c8d8ff',transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false})); gate.position.y=2; g.add(gate);
+  g.position.set(EXIT.x,terrH(EXIT.x,EXIT.z),EXIT.z); g.visible=false; scene.add(g); return g; })();
+
 /* ---------- 毎フレーム ---------- */
-LOCKMOVE=()=>{ if(!GAMEMODE) return false; if(V&&V.pre>0&&myRole==='oni') return true; const mine=V&&V.pl.find(q=>q[0]===net.myId); return !!(mine&&mine[7]); };
+LOCKMOVE=()=>{ if(!GAMEMODE) return false; if(V&&V.pre>0&&myRole==='oni') return true; const mine=V&&V.pl.find(q=>q[0]===net.myId); return !!(mine&&(mine[7]||mine[11])); };
+WALKSPD=()=>GAMEMODE&&myRole==='oni'?2.1*OSCALE:2.1;
 RUNSPD=()=>{ if(!GAMEMODE) return 4.6; if(myRole==='oni'){ const m=ROSTER.find(p=>p.id===net.myId); return OSPD[m?m.ch:0]; } return stamina>0?4.6:2.6; };
 let stamina=6, camD=3.4;
 GAMECAM=(bob,moving,dt)=>{ if(!GAMEMODE){ camera.position.set(P.x,P.y+1.6+bob,P.z); camera.rotation.set(P.pitch,P.yaw,0); return; }
@@ -1907,38 +1943,49 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   const meA=AV.get(net.myId); if(meA){ meA.av.g.visible=!HIDDEN; meA.av.g.position.set(P.x,P.y,P.z); meA.av.g.rotation.y=P.yaw+PI; meA.tag.visible=false; meA.av.o.update(t,moving&&!LOCKMOVE()); }
   // 送受信
   if(net.mode==='host'&&G){ hostStep(dt); net.sendT+=dt; if(net.sendT>=1/NET_HZ){ net.sendT=0; V=snap(); if(!net.solo) broadcast(V); } if(!V) V=snap(); }
-  else if(net.mode==='client'){ net.sendT+=dt; if(net.sendT>=1/NET_HZ){ net.sendT=0; toHost({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(2),mv:moving?1:0,hid:HIDDEN?HIDES.indexOf(HIDDEN.h):-1}); } }
+  else if(net.mode==='client'){ net.sendT+=dt; if(net.sendT>=1/NET_HZ){ net.sendT=0; toHost({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(2),mv:moving?1:0,hid:HIDDEN?HIDES.indexOf(HIDDEN.h):-1,rs:rescueTarget()}); } }
   if(!V) return;
   // 他の人
   const k=Math.min(1,dt*10);
-  V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res,away]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
+  V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res,away,hasKey,esc]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
     const R0=ROSTER.find(p=>p.id===id); if(!R0) return; const A=avFor(R0);
     A.x+=(x-A.x)*k; A.y+=(y-A.y)*k; A.z+=(z-A.z)*k; let dy=yaw-A.yaw; dy=((dy+PI)%(2*PI)+2*PI)%(2*PI)-PI; A.yaw+=dy*k;
-    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0; A.tag.material.opacity=away?.35:1; A.av.o.update(t+id,!!mv&&!wax);
+    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0&&!esc; A.tag.material.opacity=away?.35:1; if(A.keyM) A.keyM.visible=!!hasKey; A.av.o.update(t+id,!!mv&&!wax);
     if(A.wax!==!!wax){ A.wax=!!wax; waxify(A.av.g,A.wax); } });
+  // 銀の鍵
+  if(V.k){ while(KEYV.length<V.k.length){ const m=keyMesh(); scene.add(m); KEYV.push(m); } KEYV.forEach((m,i)=>{ const k=V.k[i]; m.visible=!!k&&k[3]<0; if(k){ m.position.set(k[0],k[1]+.9+Math.sin(t*2+i)*.1,k[2]); m.rotation.y=t*1.5; } }); }
+  // 地図の目印（鍵と出口）
+  SPOTS.length=0; SPOTS.push({id:'exit',name:'森の出口',x:EXIT.x,y:0,z:EXIT.z,lvl:'out',r:0,text:'',meta:[],kana:''}); if(V.k) V.k.forEach((k,i)=>{ if(k[3]<0) SPOTS.push({id:'k'+i,name:'銀の鍵',x:k[0],y:k[1],z:k[2],lvl:lvlOf(k[0],k[1],k[2]),r:0,text:'',meta:[],kana:''}); });
   // HUD
-  const free=V.pl.filter(q=>{ const r=ROSTER.find(p=>p.id===q[0]); return r&&r.role==='run'&&!q[7]; }).length, runs=ROSTER.filter(p=>p.role==='run').length;
+  const free=V.pl.filter(q=>{ const r=ROSTER.find(p=>p.id===q[0]); return r&&r.role==='run'&&!q[7]&&!q[11]; }).length, runs=ROSTER.filter(p=>p.role==='run').length;
   const tl=Math.max(0,V.pre>0?V.pre:V.tl), mm=Math.floor(tl/60), ss=Math.floor(tl%60);
   el('oniTime').textContent=V.pre>0?'鬼が動くまで '+Math.ceil(V.pre):mm+':'+String(ss).padStart(2,'0'); el('oniTime').classList.toggle('pre',V.pre>0);
   el('oniCount').textContent=`逃げている ${free} / ${runs}`;
   const mine=V.pl.find(q=>q[0]===net.myId); const iamWax=mine&&mine[7];
-  el('oniWax').hidden=!iamWax; if(iamWax) el('oniWaxBar').style.width=Math.min(100,mine[8]/2*100)+'%';
+  const iEsc=mine&&mine[11], iKey=mine&&mine[10];
+  if(iEsc&&!window._escShown){ window._escShown=1; say('脱出','銀の鍵で森の出口を開けた！ あとは仲間を待とう',6); SND.chime(); }
+  el('oniGoal').textContent=myRole==='oni'?'迷い人を全員捕まえろ。鍵を持つ者を出口へ行かせるな':iEsc?'脱出成功！ 仲間を待っています':iamWax?'':iKey?'銀の鍵を持っている！ 北の「森の出口」へ':'館のどこかにある「銀の鍵」を探せ（地図に◆）';
+  el('oniGoal').classList.toggle('key',!!iKey);
+  const wN=nearWax(); const rb=el('oniRescue'); rb.hidden=!wN||!!iamWax||!!iEsc; if(wN){ const R0=ROSTER.find(p=>p.id===wN[0]); rb.querySelector('b').textContent='長押しで助ける：'+(R0?R0.n:''); rb.querySelector('i').style.width=Math.min(100,(wN[8]||0)/3*100)+'%'; }
+  if(meA){ if(!meA.keyM){ meA.keyM=keyMesh(); meA.keyM.scale.setScalar(.7); meA.keyM.position.set(.3,1.0,-.15); meA.av.g.add(meA.keyM); } meA.keyM.visible=!!iKey; meA.av.g.visible=!HIDDEN&&!iEsc; }
+  el('oniWax').hidden=!iamWax; if(iamWax) el('oniWaxBar').style.width=Math.min(100,mine[8]/3*100)+'%';
   el('oniStam').hidden=myRole!=='run'||iamWax; el('oniStamBar').style.width=(stamina/6*100)+'%';
   // 隠れる/調べるボタン
-  const hb=$('hideBtn'); if(myRole==='oni'){ if(nearHide>=0&&!(V.pre>0)){ hb.hidden=false; hb.textContent='調べる：'+HIDES[nearHide].name; } else hb.hidden=true; }
-  else if(iamWax) hb.hidden=true;
+  const hb=$('hideBtn'); if(myRole==='oni'){ hb.hidden=true; }
+  else if(iamWax||iEsc) hb.hidden=true;
   else if(nearHide>=0){ hb.disabled=false; const taken=V.pl.some(q=>q[0]!==net.myId&&q[6]===nearHide); hb.hidden=false; hb.textContent=taken?'（だれかが隠れている）':'隠れる：'+HIDES[nearHide].name; hb.disabled=taken; }
   // 鬼が近いときの鼓動・画面の赤み
   if(myRole==='run'){ let dmin=99; V.pl.forEach(q=>{ const r=ROSTER.find(p=>p.id===q[0]); if(r&&r.role==='oni') dmin=Math.min(dmin,Math.hypot(q[1]-P.x,q[3]-P.z)+Math.abs(q[2]-P.y)*2); }); el('oniRed').style.opacity=Math.max(0,Math.min(.45,(9-dmin)/9*.45)); evT-=dt; if(dmin<9&&evT<=0&&!HIDDEN){ evT=Math.max(.35,dmin/10); SND.heart(); } }
   else el('oniRed').style.opacity=0; };
 // 隠れる／調べる
 $('hideBtn').onclick=()=>{ if(!GAMEMODE){ if(nearHide>=0) hideIn(nearHide); return; } if(nearHide<0) return;
-  if(myRole==='oni'){ toHost({t:'search',spot:nearHide}); SND.creak(); say('','「'+HIDES[nearHide].name+'」を調べた……',2); return; }
+  if(myRole==='oni') return;
   if(V&&V.pl.some(q=>q[0]!==net.myId&&q[6]===nearHide)) return; hideIn(nearHide); };
 
 /* ---------- タイトルの背景：キャラの試し見 ---------- */
 let PV=null; function preview(){ if(PV){ scene.remove(PV.g); PV=null; } if(inGame) return; const av=makeAv(me.role,me.ch); av.g.position.set(0,0,52); av.g.rotation.y=0; PV={g:av.g,o:av.o}; }
 function prevStop(){ if(PV){ scene.remove(PV.g); PV=null; } }
+ANIM.push(t=>{ if(EXITG.visible){ EXITG.children.forEach(c=>{ if(c.isSprite) c.material.opacity=.7+Math.sin(t*3)*.3; }); } });
 ANIM.push(t=>{ if(PV&&START){ PV.o.update(t,false); PV.g.rotation.y=Math.sin(t*.4)*.6; camera.position.set(0,1.5,55.4); camera.lookAt(0,-.55,52); } });
 
 /* ---------- 散策用の機能を鬼ごっこ中は止める ---------- */
