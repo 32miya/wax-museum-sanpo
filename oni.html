@@ -180,6 +180,7 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 #oniWax b{display:block;font-size:24px;color:#f0e6d2}#oniWax span{font-size:13px}
 #oniWax .bar{margin:8px auto 0;width:160px}#oniWax .bar i{background:var(--shu2)}
 #oniRed{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 35%,rgba(150,0,10,.9) 100%);transition:opacity .3s}
+#oniDrop{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.8);padding:16px}#oniDrop .box{max-width:380px;display:grid;gap:10px;text-align:center}#oniDrop b{font-family:var(--f-disp);font-size:22px}#oniDrop p{margin:0;font-size:14px;line-height:1.7}
 #oniEnd{position:fixed;inset:0;z-index:36;display:flex;align-items:center;justify-content:center;background:rgba(8,6,7,.86);padding:16px}
 #oniEnd .box{width:100%;max-width:420px;display:grid;gap:10px}#oniEnd .k{font-size:12px;letter-spacing:.2em;color:var(--mute)}#oniEnd h2{margin:0;font-family:var(--f-disp);font-size:38px;color:var(--shu2)}#oniEnd p{margin:0;line-height:1.8;font-size:14px}
 </style>
@@ -280,6 +281,7 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 <div id="oniHud" hidden><div id="oniTime"></div><div id="oniCount"></div><div id="oniStam"><div class="bar"><i id="oniStamBar"></i></div></div></div>
 <div id="oniWax" hidden><b>蝋人形にされた……</b><span>仲間にふれてもらうと動けるようになる</span><div class="bar"><i id="oniWaxBar"></i></div></div>
 <section id="oniEnd" hidden></section>
+<section id="oniDrop" hidden></section>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
@@ -1649,9 +1651,10 @@ const PEER_PREFIX='kirinomori-oni-v1-', NET_HZ=10;
 const GB={x0:-78,x1:78,z0:-78,z1:112}; // 遊べる範囲
 const qs=new URLSearchParams(location.search);
 const el=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const net={mode:null,peer:null,conns:new Map(),host:null,myId:0,code:'',sendT:0,solo:false,nextId:1};
-let me={name:'',role:'run',ch:0};
+const net={mode:null,peer:null,conns:new Map(),seen:new Map(),host:null,myId:0,code:'',sendT:0,solo:false,nextId:1};
+let me={name:'',role:'run',ch:0,tok:''};
 try{ const s=JSON.parse(localStorage.getItem('oni_me')||'{}'); Object.assign(me,s); }catch(e){}
+if(!me.tok){ me.tok=Math.random().toString(36).slice(2)+Date.now().toString(36); try{ localStorage.setItem('oni_me',JSON.stringify(me)); }catch(e){} }
 let lobby=[]; let SET={min:5,ai:'auto'};
 let G=null;   // 主だけが持つ正本
 let V=null;   // 画面に出す最新の状態（主は G から作る）
@@ -1708,21 +1711,22 @@ function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.
   G.pl.forEach(p=>{ if(p.ai) aiStep(p,dt); });
   if(G.pre<=0){
     const oni=G.pl.filter(p=>p.role==='oni'), run=G.pl.filter(p=>p.role==='run');
-    for(const r of run){ if(r.st!=='free'||r.hid>=0) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&Math.abs(o.y-r.y)<1.2){ catchRun(r,o); break; } } }
+    G.pl.forEach(p=>{ if(p.away) p.awayT=(p.awayT||0)+dt; });
+    for(const r of run){ if(r.st!=='free'||r.hid>=0||r.away) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&Math.abs(o.y-r.y)<1.2){ catchRun(r,o); break; } } }
     // 仲間を助ける（蝋になった仲間に2秒ふれる）
-    for(const w of run){ if(w.st!=='wax') continue; let near=null; for(const r of run){ if(r.st==='free'&&r.hid<0&&Math.hypot(r.x-w.x,r.z-w.z)<1.3&&Math.abs(r.y-w.y)<1.2){ near=r; break; } }
+    for(const w of run){ if(w.st!=='wax') continue; let near=null; for(const r of run){ if(r.st==='free'&&r.hid<0&&!r.away&&Math.hypot(r.x-w.x,r.z-w.z)<1.3&&Math.abs(r.y-w.y)<1.2){ near=r; break; } }
       if(near){ w.res+=dt; if(w.res>=2){ w.st='free'; w.res=0; hostEvent(near.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else w.res=Math.max(0,w.res-dt*.5); }
     const free=run.filter(r=>r.st==='free').length;
     if(run.length&&free===0) endGame('oni'); else if(G.t<=0) endGame('run'); }
   }
 function catchRun(r,o){ r.st='wax'; r.hid=-1; r.res=0; hostEvent(o.n+' が '+r.n+' を捕まえた——生きたまま蝋人形に……'); if(r.id===net.myId) forceUnhide(); else sendTo(r.id,{t:'caught'}); }
 function hostSearch(o,spot){ const h=HIDES[spot]; if(!h) return; const r=G.pl.find(p=>p.role==='run'&&p.hid===spot&&p.st==='free'); if(r){ r.x=h.ex; r.z=h.ez; r.y=h.y; catchRun(r,o); hostEvent('「'+h.name+'」の中から '+r.n+' が引きずり出された！'); } else if(!o.ai) sendTo(o.id,{t:'ev',m:'「'+h.name+'」には誰もいない……'}); }
-function endGame(win){ if(G.over) return; G.over=true; const res={t:'end',win,pl:G.pl.map(p=>({n:p.n,role:p.role,st:p.st,ai:p.ai}))}; broadcast(res); onEnd(res); }
+function endGame(win){ if(G.over) return; G.over=true; const res={t:'end',win,pl:G.pl.map(p=>({n:p.n,role:p.role,st:p.st,ai:p.ai}))}; G.endMsg=res; broadcast(res); onEnd(res); }
 // AIの動き
 function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
   const here={x:p.x,y:p.y,z:p.z};
   // 見える逃げ手
-  let tgt=null,td=1e9; for(const r of G.pl){ if(r.role!=='run'||r.st!=='free') continue; if(r.hid>=0){ if(p.mode==='chase'&&p.tid===r.id&&Math.hypot(r.x-p.x,r.z-p.z)<9){ // 目の前で隠れた
+  let tgt=null,td=1e9; for(const r of G.pl){ if(r.role!=='run'||r.st!=='free'||r.away) continue; if(r.hid>=0){ if(p.mode==='chase'&&p.tid===r.id&&Math.hypot(r.x-p.x,r.z-p.z)<9){ // 目の前で隠れた
         p.mode='search'; p.checks=[r.hid]; p.last={x:HIDES[r.hid].ex,y:HIDES[r.hid].y,z:HIDES[r.hid].ez}; p.reT=0; } continue; }
     if(sees(here,r)){ const d=Math.hypot(r.x-p.x,r.z-p.z); if(d<td){ td=d; tgt=r; } } }
   if(tgt){ p.mode='chase'; p.tid=tgt.id; p.last={x:tgt.x,y:tgt.y,z:tgt.z}; }
@@ -1752,34 +1756,80 @@ function loadPeer(){ return new Promise((res,rej)=>{ if(window.Peer) return res(
 function broadcast(m){ net.conns.forEach(c=>{ if(c.open) c.send(m); }); }
 function sendTo(id,m){ if(id===net.myId&&net.mode==='host'){ onMsg(m); return; } const c=net.conns.get(id); if(c&&c.open) c.send(m); }
 function toHost(m){ if(net.mode==='host') hostMsg(net.myId,m); else if(net.host&&net.host.open) net.host.send(m); }
-async function host(solo){ net.mode='host'; net.myId=0; net.solo=solo; lobby=[{id:0,n:me.name,role:me.role,ch:me.ch}];
+async function host(solo){ net.mode='host'; net.myId=0; net.solo=solo; lobby=[{id:0,n:me.name,role:me.role,ch:me.ch,tok:me.tok}];
   if(solo){ showLobby(); return; }
   lobbyMsg('部屋を準備しています…'); try{ await loadPeer(); }catch(e){ lobbyMsg(e.message); return; }
   const tryOpen=n=>{ net.code=String(1000+Math.floor(Math.random()*9000)); const pr=new Peer(PEER_PREFIX+net.code,peerOpts()); net.peer=pr;
-    pr.on('open',()=>{ showLobby(); });
-    pr.on('error',e=>{ if(e.type==='unavailable-id'&&n<5){ pr.destroy(); tryOpen(n+1); } else lobbyMsg('通信エラー：'+e.type); });
-    pr.on('connection',c=>{ let id=0; c.on('open',()=>{}); c.on('data',m=>{ if(m.t==='hello'){ if(inGame||lobby.length>=8){ c.send({t:'full'}); setTimeout(()=>c.close(),300); return; } id=net.nextId++; net.conns.set(id,c); lobby.push({id,n:String(m.n||'名無し').slice(0,10),role:m.role==='oni'?'oni':'run',ch:+m.ch||0}); c.send({t:'you',id}); pushLobby(); }
-        else if(id) hostMsg(id,m); }); c.on('close',()=>{ if(!id) return; net.conns.delete(id); lobby=lobby.filter(l=>l.id!==id); if(G){ const p=G.pl.find(p=>p.id===id); if(p){ p.st='gone'; G.pl=G.pl.filter(q=>q!==p); hostEvent(p.n+' が森から消えた（切断）'); } } pushLobby(); }); }); };
+    pr.on('open',()=>{ if(!inGame&&!G) showLobby(); });
+    // 仲立ちサーバーとの線が切れても、同じ部屋番号のままつなぎ直す
+    pr.on('disconnected',()=>{ if(!leaving) setTimeout(()=>{ try{ if(pr.disconnected&&!pr.destroyed) pr.reconnect(); }catch(e){} },1000); });
+    pr.on('error',e=>{ if(e.type==='unavailable-id'&&n<5&&!pr.open){ pr.destroy(); tryOpen(n+1); } else if(!G&&!lobby.length) lobbyMsg('通信エラー：'+e.type); });
+    pr.on('connection',c=>{ let id=0;
+      c.on('data',m=>{ if(id) net.seen.set(id,Date.now());
+        if(m.t==='hello'){ const tok=String(m.tok||''); const L=tok&&lobby.find(l=>l.tok===tok);
+          if(L){ // 戻ってきた人：同じ席に戻す
+            id=L.id; const old=net.conns.get(id); if(old&&old!==c){ try{ old.close(); }catch(e){} } net.conns.set(id,c); net.seen.set(id,Date.now()); L.away=false; c.send({t:'you',id});
+            if(G&&G.over&&G.endMsg){ c.send(G.endMsg); }
+            else if(G&&inGame){ const pp=G.pl.find(q=>q.id===id); if(pp){ pp.away=false; pp.awayT=0; c.send({t:'start',pl:roster(),resume:1}); c.send(snap()); hostEvent(pp.n+' が戻ってきた'); } }
+            pushLobby(); return; }
+          if(inGame||lobby.length>=8){ c.send({t:'full'}); setTimeout(()=>c.close(),300); return; }
+          id=net.nextId++; net.conns.set(id,c); net.seen.set(id,Date.now()); lobby.push({id,n:String(m.n||'名無し').slice(0,10),role:m.role==='oni'?'oni':'run',ch:+m.ch||0,tok}); c.send({t:'you',id}); pushLobby(); }
+        else if(id) hostMsg(id,m); });
+      c.on('close',()=>{ if(id&&net.conns.get(id)===c) markAway(id); }); c.on('error',()=>{ if(id&&net.conns.get(id)===c) markAway(id); }); }); };
   tryOpen(0); }
-async function join(code){ net.mode='client'; lobbyMsg('部屋 '+code+' に入っています…'); try{ await loadPeer(); }catch(e){ lobbyMsg(e.message); return; }
-  const pr=new Peer(peerOpts()); net.peer=pr; pr.on('error',e=>lobbyMsg(e.type==='peer-unavailable'?'部屋 '+code+' が見つかりません':'通信エラー：'+e.type));
-  pr.on('open',()=>{ const c=pr.connect(PEER_PREFIX+code,{reliable:true,serialization:'json'}); net.host=c; net.code=code;
-    c.on('open',()=>{ c.send({t:'hello',n:me.name,role:me.role,ch:me.ch}); }); c.on('data',onMsg); c.on('close',()=>{ if(!ended) lobbyMsg('部屋との接続が切れました。タイトルに戻ってください。'); }); }); }
-function hostMsg(id,m){ if(m.t==='pick'){ const l=lobby.find(l=>l.id===id); if(l){ l.role=m.role==='oni'?'oni':'run'; l.ch=+m.ch||0; } pushLobby(); }
-  else if(m.t==='st'&&G){ const p=G.pl.find(p=>p.id===id); if(!p) return; if(p.st==='wax'){ return; } p.x=m.x; p.y=m.y; p.z=m.z; p.yaw=m.yaw; p.mv=m.mv; p.hid=m.hid; }
+// 切れた人は、しばらく席を取っておく（控え室90秒・試合中3分）
+function markAway(id){ const c=net.conns.get(id); net.conns.delete(id); try{ c&&c.close(); }catch(e){} const L=lobby.find(l=>l.id===id); if(!L||L.away) return; L.away=true; L.awayAt=Date.now();
+  if(G&&!G.over){ const p=G.pl.find(p=>p.id===id); if(p){ p.away=true; p.awayT=0; hostEvent(p.n+' の通信が切れた……戻ってくるのを待っています'); } }
+  pushLobby(); }
+setInterval(()=>{ if(net.mode!=='host'||net.solo) return; const now=Date.now();
+  broadcast({t:'ping'});
+  net.conns.forEach((c,id)=>{ const s=net.seen.get(id)||now; if(now-s>9000) markAway(id); });
+  const lim=G&&inGame&&!G.over?180000:90000; const gone=lobby.filter(l=>l.away&&now-l.awayAt>lim);
+  if(gone.length){ gone.forEach(l=>{ lobby=lobby.filter(x=>x!==l); if(G){ const p=G.pl.find(p=>p.id===l.id); if(p){ G.pl=G.pl.filter(q=>q!==p); hostEvent(p.n+' は霧の中に消えた（戻らなかった）'); } } }); pushLobby(); }
+  if(net.peer&&net.peer.disconnected&&!net.peer.destroyed){ try{ net.peer.reconnect(); }catch(e){} } },2000);
+function roster(){ return G.pl.map(p=>({id:p.id,n:p.n,role:p.role,ch:p.ch,ai:p.ai,x:p.x,y:p.y,z:p.z,yaw:p.yaw})); }
+
+/* ---------- 子機：つなぐ・切れたらつなぎ直す ---------- */
+let leaving=false, retryT=null, retryN=0, lastRx=0, everJoined=false;
+function saveLast(code){ try{ localStorage.setItem('oni_last',JSON.stringify({code,t:Date.now()})); }catch(e){} }
+async function join(code,re){ net.mode='client'; net.code=code; saveLast(code);
+  if(!re) lobbyMsg('部屋 '+code+' に入っています…'); try{ await loadPeer(); }catch(e){ lobbyMsg(e.message); return; }
+  const go=()=>{ const c=net.peer.connect(PEER_PREFIX+code,{reliable:true,serialization:'json'}); net.host=c;
+    const giveUp=setTimeout(()=>{ if(net.host===c&&!c.open) dropped(); },15000);
+    c.on('open',()=>{ clearTimeout(giveUp); lastRx=Date.now(); c.send({t:'hello',n:me.name,role:me.role,ch:me.ch,tok:me.tok}); });
+    c.on('data',m=>{ lastRx=Date.now(); if(!everJoined&&m.t==='you'){ everJoined=true; } if(m.t==='you'){ retryN=0; dropUI(0); } onMsg(m); });
+    c.on('close',()=>{ if(net.host===c) dropped(); }); c.on('error',()=>{ if(net.host===c) dropped(); }); };
+  const pr0=net.peer; if(pr0&&!pr0.destroyed){ if(pr0.open) go(); else { pr0.once('open',go); if(pr0.disconnected) try{ pr0.reconnect(); }catch(e){} } return; }
+  const pr=new Peer(peerOpts()); net.peer=pr; pr.on('open',go);
+  pr.on('disconnected',()=>{ if(!leaving) setTimeout(()=>{ try{ if(pr.disconnected&&!pr.destroyed) pr.reconnect(); }catch(e){} },1000); });
+  pr.on('error',e=>{ if(everJoined||re){ if(e.type==='peer-unavailable'||e.type==='network'||e.type==='disconnected'||e.type==='socket-error'||e.type==='server-error') dropped(); }
+    else lobbyMsg(e.type==='peer-unavailable'?'部屋 '+code+' が見つかりません':'通信エラー：'+e.type); }); }
+function dropped(){ if(leaving||retryT||!everJoined) return; if(ended&&!inGame&&el('oniEnd').hidden===false){ /* 結果画面中も戻れるようにする */ }
+  const c=net.host; net.host=null; try{ c&&c.close(); }catch(e){} retryN++;
+  if(retryN>45){ dropUI(2); return; } dropUI(1); retryT=setTimeout(()=>{ retryT=null; join(net.code,true); },retryN<3?1200:3000); }
+function dropUI(s){ const D=el('oniDrop'); if(!s){ D.hidden=true; return; } D.hidden=false;
+  D.innerHTML=s===1?`<div class="box"><b>通信が切れました</b><p>部屋 ${esc(net.code)} にもう一度つないでいます…（${retryN}回目）</p><p class="note">そのまま待っていれば、つながったところから続きを遊べます。</p><button class="o2" id="oniDropT">タイトルへ</button></div>`
+   :`<div class="box"><b>部屋に戻れませんでした</b><p>部屋を作った人の画面が閉じられたか、通信が長く途切れています。</p><button class="o1" id="oniDropR">もう一度ためす</button><button class="o2" id="oniDropT">タイトルへ</button></div>`;
+  el('oniDropT').onclick=()=>{ leaving=true; location.reload(); }; if(el('oniDropR')) el('oniDropR').onclick=()=>{ retryN=0; dropUI(1); join(net.code,true); }; }
+setInterval(()=>{ if(net.mode!=='client'||!everJoined||leaving) return; if(net.host&&net.host.open){ net.host.send({t:'ping'}); if(Date.now()-lastRx>9000&&!retryT) dropped(); } else if(!retryT&&!net.host) dropped(); },2000);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden||leaving) return; // 画面に戻ったら、線が生きているか確かめる
+  if(net.peer&&net.peer.disconnected&&!net.peer.destroyed){ try{ net.peer.reconnect(); }catch(e){} }
+  if(net.mode==='client'&&everJoined&&(!net.host||!net.host.open||Date.now()-lastRx>5000)&&!retryT){ retryN=0; dropped(); } });
+function hostMsg(id,m){ if(m.t==='ping') return; if(m.t==='pick'){ const l=lobby.find(l=>l.id===id); if(l){ l.role=m.role==='oni'?'oni':'run'; l.ch=+m.ch||0; } pushLobby(); }
+  else if(m.t==='st'&&G){ const p=G.pl.find(p=>p.id===id); if(!p) return; if(p.away){ p.away=false; p.awayT=0; } if(p.st==='wax'){ return; } p.x=m.x; p.y=m.y; p.z=m.z; p.yaw=m.yaw; p.mv=m.mv; p.hid=m.hid; }
   else if(m.t==='search'&&G&&G.pre<=0){ const p=G.pl.find(p=>p.id===id); if(p&&p.role==='oni') hostSearch(p,m.spot); } }
 function pushLobby(){ const m={t:'lobby',list:lobby,code:net.code,set:SET}; broadcast(m); if(!inGame) showLobby(); }
-function onMsg(m){ if(m.t==='you'){ net.myId=m.id; }
+function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
   else if(m.t==='lobby'){ lobby=m.list; SET=m.set; net.code=m.code; if(!inGame) showLobby(); }
   else if(m.t==='full'){ lobbyMsg('部屋がいっぱいか、もう始まっています'); }
-  else if(m.t==='start'){ startWorld(m.pl); }
+  else if(m.t==='start'){ startWorld(m.pl,m.resume); }
   else if(m.t==='snap'){ V=m; }
   else if(m.t==='ev'){ onEv(m.m); }
   else if(m.t==='caught'){ forceUnhide(); }
   else if(m.t==='end'){ onEnd(m); }
   else if(m.t==='back'){ ended=false; inGame=false; el('oniEnd').hidden=true; teardown(); GAMEMODE=false; START=true; showLobby(); }
-  else if(m.t==='bye'){ if(!inGame) lobbyMsg('主が部屋を閉じました'); } }
-function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1)])}; }
+  else if(m.t==='bye'){ leaving=true; dropUI(0); try{ localStorage.removeItem('oni_last'); }catch(e){} lobbyMsg('主が部屋を閉じました'); } }
+function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0])}; }
 
 /* ---------- 画面（タイトル・控え室） ---------- */
 function lobbyMsg(s){ const L=el('oniL'); L.hidden=false; el('oniLbody').innerHTML=`<p class="lmsg">${esc(s)}</p><button class="o2" id="oniBack">タイトルへ</button>`; el('oniBack').onclick=()=>location.reload(); }
@@ -1787,15 +1837,18 @@ function charPicker(){ const list=me.role==='oni'?CH.DEMONS:CH.RUNNERS; me.ch=me
   <div class="chs">${list.map((c,i)=>`<button data-c="${i}" class="${i===me.ch?'on':''}">${esc(c.name)}</button>`).join('')}</div>`; }
 function bindPicker(onChange){ el('oniLbody').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ me.role=b.dataset.r; me.ch=0; save(); onChange(); }); el('oniLbody').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ me.ch=+b.dataset.c; save(); onChange(); }); }
 function save(){ try{ localStorage.setItem('oni_me',JSON.stringify(me)); }catch(e){} preview(); }
+function lastRoom(){ try{ const s=JSON.parse(localStorage.getItem('oni_last')||'null'); if(s&&Date.now()-s.t<20*60000) return s.code; }catch(e){} return ''; }
 function showTitle(){ const L=el('oniL'); L.hidden=false; const code=qs.get('room')||'';
   el('oniLbody').innerHTML=`<label class="nm">名前<input id="oniName" maxlength="10" value="${esc(me.name||'')}" placeholder="迷い人"></label>${charPicker()}
    <button class="o1" id="oniSolo">ひとりで遊ぶ（AIの鬼）</button><button class="o1" id="oniHost">部屋をつくる</button>
+   ${lastRoom()?`<button class="o1" id="oniRe">前の部屋（${esc(lastRoom())}）に戻る</button>`:''}
    <div class="joinrow"><input id="oniCode" inputmode="numeric" maxlength="4" placeholder="4桁の番号" value="${esc(code)}"><button class="o2" id="oniJoin">部屋に入る</button></div>
    <p class="note">2〜8人で遊べます（同じ部屋番号を入れた人どうし）。鬼がいないときはAIの鬼が出ます。通信はP2Pのため、回線によってはつながらないことがあります（Wi‑Fi推奨）。</p>`;
   bindPicker(showTitle); const nm=()=>{ me.name=(el('oniName').value.trim()||'迷い人').slice(0,10); save(); };
   el('oniName').onchange=nm;
   el('oniSolo').onclick=()=>{ nm(); if(me.role==='oni'){ me.role='run'; me.ch=0; } host(true); };
   el('oniHost').onclick=()=>{ nm(); host(false); };
+  if(el('oniRe')) el('oniRe').onclick=()=>{ nm(); join(lastRoom()); };
   preview();
   el('oniJoin').onclick=()=>{ nm(); const c=el('oniCode').value.replace(/\D/g,''); if(c.length!==4){ el('oniCode').focus(); return; } join(c); }; }
 function showLobby(){ const L=el('oniL'); L.hidden=false; const isHost=net.mode==='host'; const mine=lobby.find(l=>l.id===net.myId);
@@ -1803,7 +1856,7 @@ function showLobby(){ const L=el('oniL'); L.hidden=false; const isHost=net.mode=
   const link=location.origin+location.pathname+'?room='+net.code+(qs.get('peer')?'&peer='+qs.get('peer'):'');
   el('oniLbody').innerHTML=`${net.solo?'<h3>ひとりで遊ぶ</h3>':`<h3>部屋番号 <b class="code">${esc(net.code)}</b></h3><button class="o2" id="oniCopy">招待リンクをコピー</button>`}
    ${charPicker()}
-   <ul class="plist">${lobby.map(l=>`<li><span class="${l.role==='oni'?'oni':'run'}">${l.role==='oni'?'鬼':'逃'}</span>${esc(l.n)}<small>${esc((l.role==='oni'?CH.DEMONS:CH.RUNNERS)[l.ch%(l.role==='oni'?6:4)].name)}</small>${l.id===net.myId?'<em>あなた</em>':''}</li>`).join('')}</ul>
+   <ul class="plist">${lobby.map(l=>`<li><span class="${l.role==='oni'?'oni':'run'}">${l.role==='oni'?'鬼':'逃'}</span>${esc(l.n)}<small>${esc((l.role==='oni'?CH.DEMONS:CH.RUNNERS)[l.ch%(l.role==='oni'?6:4)].name)}</small>${l.away?'<em>再接続待ち</em>':''}${l.id===net.myId?'<em>あなた</em>':''}</li>`).join('')}</ul>
    ${isHost?`<div class="sets"><label>時間<select id="oniMin">${[3,5,8,10].map(v=>`<option ${SET.min==v?'selected':''} value="${v}">${v}分</option>`).join('')}</select></label>
      <label>AIの鬼<select id="oniAi">${['auto',0,1,2,3].map(v=>`<option ${SET.ai==v?'selected':''} value="${v}">${v==='auto'?'おまかせ':v+'体'}</option>`).join('')}</select></label></div>
      <button class="o1" id="oniGo">はじめる</button>`:'<p class="note">主が始めるのを待っています…</p>'}
@@ -1811,18 +1864,19 @@ function showLobby(){ const L=el('oniL'); L.hidden=false; const isHost=net.mode=
   bindPicker(()=>{ if(isHost){ const l=lobby.find(l=>l.id===net.myId); l.role=me.role; l.ch=me.ch; pushLobby(); } else { toHost({t:'pick',role:me.role,ch:me.ch}); } });
   if(el('oniCopy')) el('oniCopy').onclick=()=>{ try{ navigator.clipboard.writeText(link); el('oniCopy').textContent='コピーしました'; }catch(e){ el('oniCopy').textContent=link; } };
   if(isHost){ el('oniMin').onchange=e=>{ SET.min=+e.target.value; pushLobby(); }; el('oniAi').onchange=e=>{ SET.ai=e.target.value==='auto'?'auto':+e.target.value; pushLobby(); }; el('oniGo').onclick=hostStart; }
-  el('oniBack').onclick=()=>{ if(isHost&&!net.solo) broadcast({t:'bye'}); location.reload(); }; preview(); }
+  el('oniBack').onclick=()=>{ leaving=true; if(isHost&&!net.solo) broadcast({t:'bye'}); try{ localStorage.removeItem('oni_last'); }catch(e){} location.reload(); }; preview(); }
 function hostStart(){ if(net.solo&&me.role==='oni'){ me.role='run'; } newGame(); const pl=G.pl.map(p=>({id:p.id,n:p.n,role:p.role,ch:p.ch,ai:p.ai,x:p.x,y:p.y,z:p.z,yaw:p.yaw}));
   broadcast({t:'start',pl}); startWorld(pl); }
 
 /* ---------- 試合の開始・終了 ---------- */
 let myRole='run', ROSTER=[], myMoving=false, wasWax=false, evT=0;
-function startWorld(pl){ ROSTER=pl; inGame=true; ended=false; el('oniL').hidden=true; el('oniEnd').hidden=true; el('oniHud').hidden=false; prevStop();
+function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').hidden=true; el('oniEnd').hidden=true; el('oniHud').hidden=false; prevStop();
   const mine=pl.find(p=>p.id===net.myId); myRole=mine?mine.role:'run';
   GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
   teardown(); pl.forEach(p=>{ if(p.id!==net.myId||true) avFor(p); });
   if(!isTouch) setPad(0); else setPad(1);
+  if(resume){ say('','部屋に戻りました。続きから！',3.5); return; }
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。逃げる者を捕まえ、隠れ場所を「調べる」で暴け。':'鬼が動き出すまで10秒。館や森に散らばって隠れよう。捕まった仲間には2秒ふれると助けられる。',7); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
 function onEv(m){ say('',m,4.5); }
@@ -1832,7 +1886,7 @@ function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=fals
    <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='free'?'逃げ切り':'蝋人形'):''}</small></li>`).join('')}</ul>
    ${net.mode==='host'?'<button class="o1" id="oniAgain">控え室へ（同じ仲間で）</button>':'<p class="note">主が次を選ぶのを待っています</p>'}<button class="o2" id="oniTitle">タイトルへ</button></div>`;
   if(el('oniAgain')) el('oniAgain').onclick=()=>{ G=null; V=null; broadcast({t:'back'}); onMsg({t:'back'}); };
-  el('oniTitle').onclick=()=>location.reload(); }
+  el('oniTitle').onclick=()=>{ leaving=true; if(net.mode==='host'&&!net.solo) broadcast({t:'bye'}); location.reload(); }; }
 let LOCKBY=false;
 function forceUnhide(){ if(HIDDEN) hideOut(); }
 
@@ -1857,10 +1911,10 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   if(!V) return;
   // 他の人
   const k=Math.min(1,dt*10);
-  V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
+  V.pl.forEach(q=>{ const [id,x,y,z,yaw,mv,hid,wax,res,away]=q; if(id===net.myId){ if(wax&&!wasWax){ wasWax=true; if(HIDDEN) hideOut(); warpTo(x,y,z,null); flash(); SND.scream(.8,0); } if(!wax&&wasWax){ wasWax=false; say('','助け出された！ もう一度逃げよう',3); } if(meA&&meA.wax!==!!wax){ meA.wax=!!wax; waxify(meA.av.g,meA.wax); } return; }
     const R0=ROSTER.find(p=>p.id===id); if(!R0) return; const A=avFor(R0);
     A.x+=(x-A.x)*k; A.y+=(y-A.y)*k; A.z+=(z-A.z)*k; let dy=yaw-A.yaw; dy=((dy+PI)%(2*PI)+2*PI)%(2*PI)-PI; A.yaw+=dy*k;
-    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0; A.av.o.update(t+id,!!mv&&!wax);
+    A.av.g.position.set(A.x,A.y,A.z); A.av.g.rotation.y=A.yaw+PI; A.av.g.visible=hid<0; A.tag.material.opacity=away?.35:1; A.av.o.update(t+id,!!mv&&!wax);
     if(A.wax!==!!wax){ A.wax=!!wax; waxify(A.av.g,A.wax); } });
   // HUD
   const free=V.pl.filter(q=>{ const r=ROSTER.find(p=>p.id===q[0]); return r&&r.role==='run'&&!q[7]; }).length, runs=ROSTER.filter(p=>p.role==='run').length;
