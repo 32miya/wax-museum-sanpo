@@ -206,6 +206,9 @@ body.ingame .place,body.ingame #spotsBtn,body.ingame #poi{display:none!important
 body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 @media (max-height:520px){ #oniSpec,body.touchui #oniSpec{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 10px)} }
 @media (min-height:521px){ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 180px)} }
+#tEra,#tTime,#tFog,#tHome,#tStory{display:none!important}
+.tools{grid-template-columns:repeat(3,1fr)!important}
+#oniRules .rb{max-width:36em;font-size:14px;line-height:1.85}#oniRules .rb h3{font-family:var(--f-disp);font-size:17px;margin:14px 0 4px;color:#f0c8c0}#oniRules .rb p,#oniRules .rb ul{margin:0 0 6px}#oniRules .rb ul{padding-left:1.3em}
 </style>
 </head>
 <body>
@@ -227,6 +230,8 @@ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
     <button class="tool" id="tFog"><small>霧</small><b id="vFog">濃い</b></button>
     <button class="tool" id="tHome"><small>入口へ</small><b>戻る</b></button>
     <button class="tool" id="tStory"><small>物語</small><b>読む</b></button>
+    <button class="tool" id="tRules"><small>遊び方</small><b>見る</b></button>
+    <button class="tool" id="tLeave"><small>ゲームを</small><b>やめる</b></button>
   </div>
   <div class="mrow"><span>見回す速さ</span><div class="seg" id="sensSeg"><button data-v="0">ゆっくり</button><button data-v="1">ふつう</button><button data-v="2">速い</button></div></div>
   <div class="mrow"><span>操作パッド</span><div class="seg" id="padSeg"><button data-v="1">表示</button><button data-v="0">隠す</button></div></div>
@@ -308,6 +313,14 @@ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 <button id="oniCrouch" hidden>しゃがむ</button>
 <button id="oniRescue" hidden><b>長押しで助ける</b><span><i></i></span></button>
 <section id="oniDrop" hidden></section>
+<section id="oniRules" class="ovl" hidden><header><h2>遊び方</h2><button class="x" id="oniRulesX">閉じる</button></header><div class="rb">
+<h3>逃げる側の勝ち</h3><p>森の入口から出発し、館のどこかにある「銀の鍵」を拾って、北の「森の出口」までたどり着けば脱出。ひとりでも脱出すれば逃げる側の勝ち。</p>
+<h3>鬼の勝ち</h3><p>誰も脱出させずに全員を捕まえるか、時間切れまで脱出させなければ鬼の勝ち。鬼は館の中と森に最低2体。</p>
+<h3>身を守る</h3><ul><li>隠れ場所（箪笥・棺・カーテンなど）に入っている間は、絶対に捕まらない</li><li>「しゃがむ」と、木箱や倒木など低い物の陰に体が隠れる。霧の中でも見えにくくなる</li><li>画面が<b style="color:#ff5050">赤</b>＝見つかって追われている／<b style="color:#ffd040">黄</b>＝近くで探されている</li></ul>
+<h3>捕まったら</h3><p>蝋人形にされて動けなくなる。持っていた鍵は元の場所に戻る。仲間がそばで「助ける」を3秒長押しすると復活（手を離すと0から）。</p>
+<h3>脱出したら</h3><p>まだ逃げている仲間の視点で観戦できる（◀ ▶で切り替え）。</p>
+<h3>操作</h3><ul><li>左のパッドで移動、右のパッドか画面のドラッグで見回す</li><li>「走る」は走れる時間（白いバー）に限りがある</li><li>パソコン：WASDで移動、Shiftで走る、Cでしゃがむ、Eで隠れる、Rを長押しで助ける</li></ul>
+</div></section>
 <div id="oniSpec" hidden><button id="oniSpecL" aria-label="前の仲間">◀</button><div><small>観戦中</small><b id="oniSpecN"></b></div><button id="oniSpecR" aria-label="次の仲間">▶</button></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -1712,6 +1725,8 @@ function buildNav(){ const st=.8, key=(i,j,y)=>i+','+j+','+Math.round(y*2); cons
   nodes.forEach(n=>n.nb.forEach(m=>{ if(!m.nb.includes(n)) m.nb.push(n); }));
   const arr=[...nodes.values()]; const grid=new Map(); arr.forEach(n=>{ const g=Math.round(n.x/st)+','+Math.round(n.z/st); if(!grid.has(g)) grid.set(g,[]); grid.get(g).push(n); });
   NAV={st,arr,grid,near(x,y,z){ const i=Math.round(x/st),j=Math.round(z/st); let best=null,bd=1e9; for(let di=-2;di<=2;di++) for(let dj=-2;dj<=2;dj++){ const l=grid.get((i+di)+','+(j+dj)); if(!l) continue; for(const n of l){ const d=(n.x-x)**2+(n.z-z)**2+((n.y-y)*3)**2; if(d<bd){ bd=d; best=n; } } } return best; }};
+  // 本体（館の玄関ホールとつながっている部分）だけを行き先の候補にする
+  { const s=NAV.near(0,0,24); const seen=new Set([s]); const q=[s]; while(q.length){ const n=q.shift(); for(const m of n.nb) if(!seen.has(m)){ seen.add(m); q.push(m); } } NAV.main=NAV.arr.filter(n=>seen.has(n)); }
   return NAV; }
 function flow(goal){ const D=new Map(); if(!goal) return D; const q=[goal]; D.set(goal,0); let h=0; while(h<q.length){ const n=q[h++], d=D.get(n); for(const m of n.nb){ if(!D.has(m)){ D.set(m,d+1); q.push(m); } } } return D; }
 
@@ -1741,12 +1756,13 @@ function newGame(){ const pl=lobby.map((L,i)=>({id:L.id,n:L.n,role:L.role,ch:L.c
   const nRun=Math.max(1,pl.filter(p=>p.role==='run').length); const idx=KEYSPOTS.map((k,i)=>i).sort(()=>Math.random()-.5).slice(0,Math.min(KEYSPOTS.length,nRun+1));
   G={pl,t:SET.min*60,pre:10,over:false,evs:[],keys:idx.map(i=>({i,x:KEYSPOTS[i][0],y:KEYSPOTS[i][1],z:KEYSPOTS[i][2],by:-1}))};
   // AIの鬼のうち1体は、はじめに森の入口の方へ道の半分まで出てきて、館へ戻る
-  const hunter=G.pl.find(p=>p.ai&&p.home==='house'); if(hunter){ hunter.mode='hunt'; hunter.huntT=90; const pt=PATH[5+Math.floor(Math.random()*2)]; hunter.goal={x:pt[0],y:0,z:pt[1]}; G.hunter=hunter.n; }
+  // 館の鬼は、動き出してから30秒は館の中だけを徘徊する
+  G.pl.forEach(p=>{ if(p.ai&&p.home==='house'){ p.houseT=30; } }); G.hunter=null;
   if(G.pl.some(p=>p.ai)&&!NAV) buildNav();
   return G; }
 function hostEvent(m){ broadcast({t:'ev',m}); onEv(m); }
 function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free'){ me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; me0.rs=rescueTarget(); me0.cr=CROUCH?1:0; } }
-  if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent(G.hunter?'鬼が動き出した！ 森にも館にも鬼がいる——「'+G.hunter+'」が館から小道を見回りに来る……':'鬼が動き出した！'); }
+  if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent('鬼が動き出した！ 館の中と森に、鬼がいる……'); }
   else G.t-=dt;
   // AI鬼
   G.pl.forEach(p=>{ if(p.ai) aiStep(p,dt); });
@@ -1787,11 +1803,13 @@ function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
   if(p.mode==='chase'){ goal=p.last; spd=p.spd*.95; }
   else if(p.mode==='lurk'){ goal=p.last; spd=2.4*OSCALE; p.lurkT-=dt; if(p.lurkT<=0){ p.mode='patrol'; p.goal=null; } }
   else if(p.mode==='search'){ spd=3.4*OSCALE; { goal=p.last; if(!p.last||Math.hypot(p.last.x-p.x,p.last.z-p.z)<1.5){ p.mode='patrol'; p.goal=null; } } }
+  if(p.houseT>0){ p.houseT-=dt; if(p.houseT<=0&&p.mode==='patrol'){ p.goal=null; } }
   if(p.mode==='hunt'){ p.huntT-=dt; goal=p.goal; spd=3.4*OSCALE; if(p.huntT<=0||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<3){ p.mode='return'; p.goal={x:R(-2,2),y:0,z:36}; } }
   if(p.mode==='return'){ goal=p.goal; spd=2.4*OSCALE; if(Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<3){ p.mode='patrol'; p.goal=null; } }
   if(p.mode==='patrol'||p.mode==='wait'){ // 鍵を持つ者を優先して追う
     const kr=G.pl.find(r=>r.role==='run'&&r.st==='free'&&r.key>=0&&!r.away&&r.hid<0&&Math.hypot(r.x-p.x,r.z-p.z)<30); if(kr&&Math.random()<.02){ p.goal={x:kr.x,y:kr.y,z:kr.z}; } p.mode='patrol'; if((!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5)&&p.home==='forest'&&Math.random()<.9){ const T=TRAILS[Math.floor(Math.random()*TRAILS.length)], q=T[Math.floor(Math.random()*T.length)]; if(q[1]<GB.z1-4&&q[1]>GB.z0+4&&!inR(ESTATE,q[0],q[1],2)){ p.goal={x:q[0],y:terrH(q[0],q[1]),z:q[1]}; p.reT=0; } } // 森の鬼は獣道を中心に見回る
-    if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5){ const rr=Math.random(); if(rr<.35){ const i=Math.floor(Math.random()*HIDES.length), h=HIDES[i]; p.goal={x:h.ex,y:h.y,z:h.ez}; } else if(rr<.6){ const k=G.keys[Math.floor(Math.random()*G.keys.length)]; p.goal=Math.random()<.5&&k?{x:k.x,y:k.y,z:k.z}:{x:EXIT.x+R(-6,6),y:0,z:EXIT.z+R(4,12)}; } else { const n=NAV.arr[Math.floor(Math.random()*NAV.arr.length)]; p.goal={x:n.x,y:n.y,z:n.z}; } p.reT=0; }
+    if((!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5)&&p.houseT>0){ const H=NAV.house||(NAV.house=NAV.main.filter(n=>inR(FOOT,n.x,n.z,-.6))); const n=H[Math.floor(Math.random()*H.length)]; if(n){ p.goal={x:n.x,y:n.y,z:n.z}; p.reT=0; } } // 館の中だけ
+    if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5){ const rr=Math.random(); if(rr<.35){ const i=Math.floor(Math.random()*HIDES.length), h=HIDES[i]; p.goal={x:h.ex,y:h.y,z:h.ez}; } else if(rr<.6){ const k=G.keys[Math.floor(Math.random()*G.keys.length)]; p.goal=Math.random()<.5&&k?{x:k.x,y:k.y,z:k.z}:{x:EXIT.x+R(-6,6),y:0,z:EXIT.z+R(4,12)}; } else { const n=NAV.main[Math.floor(Math.random()*NAV.main.length)]; p.goal={x:n.x,y:n.y,z:n.z}; } p.reT=0; }
     goal=p.goal; spd=2.4*OSCALE; }
   if(!goal) return;
   // 直接見えているなら直進、そうでなければ網をたどる
@@ -1800,6 +1818,7 @@ function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
   else { if(p.reT<=0||!p.D){ p.reT=.7; p.gn=NAV.near(goal.x,goal.y,goal.z); p.D=flow(p.gn); }
     // 網の点を一つずつたどる（毎回いちばん近い点を探し直すと行ったり来たりするため）
     if(!p.tn||!p.D.has(p.tn)||Math.hypot(p.tn.x-p.x,p.tn.z-p.z)>3) p.tn=NAV.near(p.x,p.y,p.z);
+    if(p.tn&&!p.D.has(p.tn)&&p.mode!=='chase'){ p.goal=null; p.D=null; p.tn=null; p.mv=0; return; } // 行けない行き先はあきらめる
     let guard=0; while(p.tn&&Math.hypot(p.tn.x-p.x,p.tn.z-p.z)<.4&&guard++<4){ let b=p.tn,bd=p.D.get(p.tn); for(const m of p.tn.nb){ const d=p.D.get(m); if(d!=null&&d<bd){ bd=d; b=m; } } if(b===p.tn){ p.tn=null; break; } p.tn=b; }
     p.nb1=null; if(p.tn){ dirx=p.tn.x-p.x; dirz=p.tn.z-p.z; } else { dirx=goal.x-p.x; dirz=goal.z-p.z; } }
   const L=Math.hypot(dirx,dirz); if(L<.05){ p.mv=0; return; } const step=Math.min(L,spd*dt); const nx=p.x+dirx/L*step, nz=p.z+dirz/L*step;
@@ -1936,7 +1955,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
   teardown(); pl.forEach(p=>{ if(p.id!==net.myId||true) avFor(p); });
-  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; OBST.g.visible=true; window._escShown=0; el('fudaN').hidden=true; document.body.classList.add('ingame'); el('spotsBtn').hidden=true; el('poi').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
+  if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; OBST.g.visible=true; { const nt=el('map').querySelector('.note'); if(nt) nt.textContent='◆は「銀の鍵」と「森の出口」。青い丸は仲間です。鬼ごっこの間は地図から移動できません。'; } window._escShown=0; el('fudaN').hidden=true; document.body.classList.add('ingame'); el('spotsBtn').hidden=true; el('poi').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
   if(resume){ say('','部屋に戻りました。続きから！',3.5); return; }
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
@@ -2086,6 +2105,11 @@ function prevStop(){ if(PV){ scene.remove(PV.g); PV=null; } }
 ANIM.push(t=>{ if(EXITG.visible){ EXITG.children.forEach(c=>{ if(c.isSprite) c.material.opacity=.7+Math.sin(t*3)*.3; }); } });
 ANIM.push(t=>{ if(PV&&START){ PV.o.update(t,false); PV.g.rotation.y=Math.sin(t*.4)*.6; camera.position.set(0,1.5,55.4); camera.lookAt(0,-.55,52); } });
 
+/* ---------- メニュー（鬼ごっこ用） ---------- */
+el('tRules').onclick=()=>{ el('menu').hidden=true; el('menuBtn').setAttribute('aria-expanded',false); el('oniRules').hidden=false; };
+el('oniRulesX').onclick=()=>{ el('oniRules').hidden=true; };
+el('tLeave').onclick=()=>{ el('menu').hidden=true; const D=el('oniDrop'); D.hidden=false; D.innerHTML=`<div class="box"><b>ゲームをやめますか？</b><p>${net.mode==='host'&&!net.solo?'あなたは部屋の主です。やめると部屋が終わり、全員の試合が終わります。':'タイトルに戻ります。20分以内なら「前の部屋に戻る」で戻れます。'}</p><button class="o1" id="oniLeaveY">やめる</button><button class="o2" id="oniLeaveN">続ける</button></div>`;
+  el('oniLeaveN').onclick=()=>{ D.hidden=true; }; el('oniLeaveY').onclick=()=>{ leaving=true; if(net.mode==='host'&&!net.solo) broadcast({t:'bye'}); location.reload(); }; };
 /* ---------- 散策用の機能を鬼ごっこ中は止める ---------- */
 { const ow=warpSpot; warpSpot=function(i){ if(GAMEMODE){ el('map').hidden=true; say('','鬼ごっこの間は地図から移動できません',2.5); return; } ow(i); };
   const th=el('tHome').onclick; el('tHome').onclick=()=>{ if(!GAMEMODE) th(); };
