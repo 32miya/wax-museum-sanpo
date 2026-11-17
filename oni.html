@@ -1707,7 +1707,7 @@ return {DEMONS,RUNNERS};
 const ONI=(function(){
 const PEER_PREFIX='kirinomori-oni-v1-', NET_HZ=10;
 const GB={x0:-80,x1:80,z0:-86,z1:198};
-const EXIT={x:0,y:0,z:-80,r:3.5}; const OSCALE=1.2; // 鬼は1.2倍速 // 遊べる範囲
+const EXIT={x:0,y:0,z:-80,r:3.5}; const GSPD=1.1; const OSCALE=1.2*GSPD; // 全員1.1倍、鬼はさらに1.2倍 // 遊べる範囲
 const qs=new URLSearchParams(location.search);
 const el=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const net={mode:null,peer:null,conns:new Map(),seen:new Map(),host:null,myId:0,code:'',sendT:0,solo:false,nextId:1};
@@ -2044,8 +2044,8 @@ GAMEMINI=(mg,W,scale,lv)=>{ if(!GAMEMODE||!V) return; V.pl.forEach(q=>{ if(q[0]=
     if(q[7]){ mg.fillStyle='#7a1018'; mg.font='bold 10px sans-serif'; mg.textAlign='center'; mg.textBaseline='middle'; mg.fillText('!',dx,dz+.5); } }); };
 /* ---------- 毎フレーム ---------- */
 LOCKMOVE=()=>{ if(!GAMEMODE) return false; if(V&&V.pre>0&&myRole==='oni') return true; const mine=V&&V.pl.find(q=>q[0]===net.myId); return !!(mine&&(mine[7]||mine[11])); };
-WALKSPD=()=>GAMEMODE&&myRole==='oni'?2.1*OSCALE:(GAMEMODE&&CROUCH?1.35:2.1);
-RUNSPD=()=>{ if(!GAMEMODE) return 4.6; if(myRole==='oni'){ const m=ROSTER.find(p=>p.id===net.myId); return OSPD[m?m.ch:0]; } if(CROUCH) return 1.35; return stamina>0?4.6:2.6; };
+WALKSPD=()=>!GAMEMODE?2.1:myRole==='oni'?2.1*OSCALE:(CROUCH?1.35:2.1)*GSPD;
+RUNSPD=()=>{ if(!GAMEMODE) return 4.6; if(myRole==='oni'){ const m=ROSTER.find(p=>p.id===net.myId); return OSPD[m?m.ch:0]; } if(CROUCH) return 1.35*GSPD; return (stamina>0?4.6:2.6)*GSPD; };
 let stamina=6, camD=3.4;
 /* ---------- 観戦（脱出した後、まだ逃げている仲間の視点で見る） ---------- */
 let SPEC={on:false,id:-1,off:0,lastYaw:0};
