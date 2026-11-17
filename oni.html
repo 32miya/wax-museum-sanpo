@@ -1792,7 +1792,7 @@ function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.
     // 仲間を助ける：蝋になった仲間のそばで3秒長押し。手を離すと0から
     for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<2.4&&Math.abs(r.y-w.y)<1.5);
       // 通信の遅れで一瞬とぎれても0に戻さない（0.4秒以上とぎれたら0から）
-      if(h){ w.res+=dt; w.rgap=0; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else { w.rgap=(w.rgap||0)+dt; if(w.rgap>.4) w.res=0; } }
+      if(h){ w.res+=dt; w.rgap=0; w.helper=h.id; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else { const hp=run.find(r=>r.id===w.helper); if(!hp||hp.rs!==w.id){ w.res=0; w.helper=null; } else { w.rgap=(w.rgap||0)+dt; if(w.rgap>.4) w.res=0; } } } // 手を離したら即0、通信の揺れは0.4秒まで待つ
     // 見つかっているか（2＝追われている／1＝近くで探されている）
     for(const r of run){ let al=0; if(r.st==='free'&&!r.away){ for(const o of oni){ const d=Math.hypot(o.x-r.x,o.z-r.z), dy=Math.abs(o.y-r.y);
           if(r.hid<0){ if(o.ai){ if(o.mode==='chase'&&o.tid===r.id) al=2; else if((o.mode==='search'||o.mode==='lurk')&&o.last&&Math.hypot(o.last.x-r.x,o.last.z-r.z)<10&&dy<2) al=Math.max(al,1); else if(d<9&&dy<2) al=Math.max(al,1); }
