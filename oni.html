@@ -209,6 +209,22 @@ body.touchui #oniSpec{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 #tEra,#tTime,#tFog,#tHome,#tStory{display:none!important}
 .tools{grid-template-columns:repeat(3,1fr)!important}
 #oniRules .rb{max-width:36em;font-size:14px;line-height:1.85}#oniRules .rb h3{font-family:var(--f-disp);font-size:17px;margin:14px 0 4px;color:#f0c8c0}#oniRules .rb p,#oniRules .rb ul{margin:0 0 6px}#oniRules .rb ul{padding-left:1.3em}
+body.ingame.touchui #runBtn{left:calc(env(safe-area-inset-left,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 160px);width:60px;height:36px}
+body.ingame.touchui #oniCrouch{left:calc(env(safe-area-inset-left,0px) + 86px);bottom:calc(env(safe-area-inset-bottom,0px) + 160px);width:60px;height:36px}
+body.ingame.touchui #levelBtn{right:calc(env(safe-area-inset-right,0px) + 54px);bottom:calc(env(safe-area-inset-bottom,0px) + 160px);height:36px}
+body.ingame .pbase span{display:none}
+body.ingame #spotList{display:none}
+body.ingame #oniCrouch,body.ingame.touchui #runBtn{padding:0;font-size:12px;white-space:nowrap}
+@media (max-height:520px){ body.ingame #map{padding-top:calc(env(safe-area-inset-top,0px) + 8px);gap:6px} body.ingame #map h2{display:none}
+  body.ingame #map header{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);z-index:2}
+  body.ingame .lvtabs{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 8px);flex-direction:column;z-index:2}
+  body.ingame #map .note{font-size:10px} }
+body.ingame .mapbody{justify-content:center}
+body.ingame .mapframe{flex:0 0 auto;max-width:none;margin:0 auto}
+body.ingame #map .note{text-align:center}
+.mpin{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;padding:2px 6px 2px 4px;border-radius:7px;background:rgba(14,11,13,.85);font-size:11px;white-space:nowrap;pointer-events:none}
+.mpin::before{content:"";width:9px;height:9px;border-radius:50%;background:#5aa0ff;border:1.5px solid #000}
+.mpin.wax::before{background:#f0e6d2}.mpin.oni::before{background:#ff5050}
 </style>
 </head>
 <body>
@@ -2110,6 +2126,15 @@ el('tRules').onclick=()=>{ el('menu').hidden=true; el('menuBtn').setAttribute('a
 el('oniRulesX').onclick=()=>{ el('oniRules').hidden=true; };
 el('tLeave').onclick=()=>{ el('menu').hidden=true; const D=el('oniDrop'); D.hidden=false; D.innerHTML=`<div class="box"><b>ゲームをやめますか？</b><p>${net.mode==='host'&&!net.solo?'あなたは部屋の主です。やめると部屋が終わり、全員の試合が終わります。':'タイトルに戻ります。20分以内なら「前の部屋に戻る」で戻れます。'}</p><button class="o1" id="oniLeaveY">やめる</button><button class="o2" id="oniLeaveN">続ける</button></div>`;
   el('oniLeaveN').onclick=()=>{ D.hidden=true; }; el('oniLeaveY').onclick=()=>{ leaving=true; if(net.mode==='host'&&!net.solo) broadcast({t:'bye'}); location.reload(); }; };
+/* ---------- 大きな地図（鬼ごっこ用：中央に大きく、仲間も表示） ---------- */
+{ const od=drawMap; drawMap=function(){ od(); if(!GAMEMODE) return; const fr=el('mapFrame'), L=LVCAN[mapLv]; if(!L) return;
+    const r=L.W/L.H, land=innerHeight<520, aw=innerWidth-(land?300:32), ah=innerHeight-(land?44:190); let w=Math.min(aw,ah*r); fr.style.width=w+'px'; fr.style.height=(w/r)+'px'; fr.style.aspectRatio='';
+    fr.querySelectorAll('.pin').forEach(b=>{ b.onclick=null; b.style.pointerEvents='none'; });
+    fr.querySelectorAll('.mpin').forEach(b=>b.remove());
+    if(V) V.pl.forEach(q=>{ if(q[0]===net.myId||q[11]) return; const r0=ROSTER.find(p=>p.id===q[0]); if(!r0||r0.role!==myRole) return; if(lvlOf(q[1],q[2],q[3])!==mapLv) return;
+      const d=document.createElement('div'); d.className='mpin'+(q[7]?' wax':'')+(myRole==='oni'?' oni':''); d.textContent=r0.n+(q[7]?'（蝋人形）':''); d.style.left=((q[1]-L.B.x0)/(L.B.x1-L.B.x0)*100)+'%'; d.style.top=((q[3]-L.B.z0)/(L.B.z1-L.B.z0)*100)+'%'; fr.appendChild(d); });
+    const nt=el('map').querySelector('.note'); if(nt) nt.textContent='◆は「銀の鍵」と「森の出口」、白い丸があなた、青い丸は仲間。「館・一階」などのボタンで階を切り替えられます。'; };
+  addEventListener('resize',()=>{ if(!el('map').hidden&&GAMEMODE) drawMap(); }); }
 /* ---------- 散策用の機能を鬼ごっこ中は止める ---------- */
 { const ow=warpSpot; warpSpot=function(i){ if(GAMEMODE){ el('map').hidden=true; say('','鬼ごっこの間は地図から移動できません',2.5); return; } ow(i); };
   const th=el('tHome').onclick; el('tHome').onclick=()=>{ if(!GAMEMODE) th(); };
