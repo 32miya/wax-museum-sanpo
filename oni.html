@@ -1834,6 +1834,12 @@ function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
 
 /* ---------- CPUの逃げ手（ひとり用で鬼を選んだとき） ---------- */
 function freeSpot(i){ return !G.pl.some(q=>q.role==='run'&&q.hid===i); }
+// 救出に行く相手：鍵を持っていないCPUは、捕まった仲間ごとに近い順で2人まで（距離は問わない）。鍵を持ったCPUは20m以内なら寄り道
+function rescueFor(p){ const wax=G.pl.filter(q=>q.role==='run'&&q.st==='wax'); if(!wax.length) return null; const d=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z)+Math.abs(a.y-b.y)*6;
+  if(p.key>=0) return wax.find(w=>d(w,p)<20)||null;
+  wax.sort((a,b)=>d(a,p)-d(b,p));
+  for(const w of wax){ const c=G.pl.filter(q=>q.ai&&q.role==='run'&&q.st==='free'&&q.hid<0&&q.key<0).sort((a,b)=>d(a,w)-d(b,w)).slice(0,2); if(c.includes(p)) return w; }
+  return null; }
 function runStep(p,dt){ if(p.st!=='free'||!NAV){ p.mv=0; return; } p.pT=(p.pT||0)-dt; p.sta=p.sta==null?6:p.sta;
   const oni=G.pl.filter(q=>q.role==='oni'); let th=null,td=1e9; for(const o of oni){ const d=Math.hypot(o.x-p.x,o.z-p.z); if(d<td&&Math.abs(o.y-p.y)<2&&(d<5||(d<15&&sees(p,o)))){ td=d; th=o; } }
   // 隠れている
@@ -1847,10 +1853,10 @@ function runStep(p,dt){ if(p.st!=='free'||!NAV){ p.mv=0; return; } p.pT=(p.pT||0
     run=true; }
   else if(p.plan&&(p.plan.t==='flee'||p.plan.t==='hide')&&p.pT<=-4) p.plan=null; // 逃げ切ったら元の目的へ
   if(!p.plan||p.plan.t==='key'||p.plan.t==='exit'||p.plan.t==='rescue'||p.plan.t==='roam'){
-    if(p.key>=0) p.plan={t:'exit'};
-    else { const w=G.pl.find(q=>q.role==='run'&&q.st==='wax'&&Math.hypot(q.x-p.x,q.z-p.z)<30&&Math.abs(q.y-p.y)<1.5);
-      if(w&&!th) p.plan={t:'rescue',id:w.id};
-      else { let bk=null,bd=1e9; G.keys.forEach(k=>{ if(k.by>=0) return; const taken=G.pl.some(q=>q!==p&&q.ai&&q.role==='run'&&q.plan&&q.plan.t==='key'&&q.plan.k===k); const d=Math.hypot(k.x-p.x,k.z-p.z)+Math.abs(k.y-p.y)*8+(taken?60:0); if(d<bd){ bd=d; bk=k; } });
+    const w=th?null:rescueFor(p);
+    if(w) p.plan={t:'rescue',id:w.id};
+    else if(p.key>=0) p.plan={t:'exit'};
+    else { { let bk=null,bd=1e9; G.keys.forEach(k=>{ if(k.by>=0) return; const taken=G.pl.some(q=>q!==p&&q.ai&&q.role==='run'&&q.plan&&q.plan.t==='key'&&q.plan.k===k); const d=Math.hypot(k.x-p.x,k.z-p.z)+Math.abs(k.y-p.y)*8+(taken?60:0); if(d<bd){ bd=d; bk=k; } });
         if(bk) p.plan={t:'key',k:bk}; else if(!p.plan||p.plan.t!=='roam'){ const h=HIDES[Math.floor(Math.random()*HIDES.length)]; p.plan={t:'roam',x:h.ex,y:h.y,z:h.ez}; } } } }
   if(p.wait>0&&G.pre<=0){ p.wait-=dt; p.mv=0; return; }
   if(p.first&&!th&&p.key<0&&p.plan&&p.plan.t!=='rescue'){ p.plan={t:'roam',x:p.first.x,y:terrH(p.first.x,p.first.z),z:p.first.z}; if(Math.hypot(p.first.x-p.x,p.first.z-p.z)<4) p.first=null; } // まずは森の別々の道へ散らばる
@@ -1860,7 +1866,10 @@ function runStep(p,dt){ if(p.st!=='free'||!NAV){ p.mv=0; return; } p.pT=(p.pT||0
   else if(P0.t==='exit') goal={x:EXIT.x,y:0,z:EXIT.z};
   else if(P0.t==='key') goal={x:P0.k.x,y:P0.k.y,z:P0.k.z};
   else if(P0.t==='roam'){ goal=P0; if(Math.hypot(P0.x-p.x,P0.z-p.z)<(p.first?4:1.5)){ p.plan=null; p.first=null; } }
-  else if(P0.t==='rescue'){ const w=G.pl.find(q=>q.id===P0.id); if(!w||w.st!=='wax'){ p.plan=null; p.mv=0; return; } goal=w; if(Math.hypot(w.x-p.x,w.z-p.z)<1.2){ p.rs=w.id; p.mv=0; return; } }
+  else if(P0.t==='rescue'){ const w=G.pl.find(q=>q.id===P0.id); if(!w||w.st!=='wax'){ p.plan=null; p.mv=0; return; }
+    // 捕まった仲間のそばで鬼が待ち伏せしていたら、離れたところで様子を見る
+    const guard=oni.some(o=>Math.hypot(o.x-w.x,o.z-w.z)<8&&Math.abs(o.y-w.y)<2); if(guard&&Math.hypot(w.x-p.x,w.z-p.z)<20){ p.mv=0; return; }
+    goal=w; run=Math.hypot(w.x-p.x,w.z-p.z)<25; if(Math.hypot(w.x-p.x,w.z-p.z)<1.2){ p.rs=w.id; p.mv=0; return; } }
   if(!goal){ p.mv=0; return; }
   if(G.pre>0) run=false;
   if(run&&p.sta>0){ p.sta=Math.max(0,p.sta-dt); } else p.sta=Math.min(6,p.sta+dt*.8);
