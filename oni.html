@@ -183,6 +183,7 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 body:not(.touchui) #oniCrouch{left:calc(env(safe-area-inset-left,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
 #oniRescue{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:7;min-width:220px;height:60px;border-radius:16px;border:1px solid rgba(224,49,59,.8);background:rgba(90,8,14,.9);color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;-webkit-user-select:none;user-select:none;touch-action:none}
 body.touchui #oniRescue{bottom:calc(env(safe-area-inset-bottom,0px) + 290px)}
+#oniRescue,#oniRescue *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#oniRescue *{pointer-events:none}
 #oniRescue b{font-size:14px}#oniRescue span{width:80%;height:6px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden}#oniRescue i{display:block;height:100%;width:0;background:#fff}
 #oniRescue.on{background:rgba(163,18,27,1);box-shadow:0 0 20px rgba(224,49,59,.8)}
 .bar{width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,.15);margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:#e8e0d0}
@@ -1789,8 +1790,9 @@ function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.
     G.pl.forEach(p=>{ if(p.away) p.awayT=(p.awayT||0)+dt; });
     for(const r of run){ if(r.st!=='free'||r.hid>=0||r.away) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&Math.abs(o.y-r.y)<1.2){ catchRun(r,o); break; } } } // 隠れている者は絶対に捕まらない
     // 仲間を助ける：蝋になった仲間のそばで3秒長押し。手を離すと0から
-    for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<1.6&&Math.abs(r.y-w.y)<1.2);
-      if(h){ w.res+=dt; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else w.res=0; }
+    for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<2.4&&Math.abs(r.y-w.y)<1.5);
+      // 通信の遅れで一瞬とぎれても0に戻さない（0.4秒以上とぎれたら0から）
+      if(h){ w.res+=dt; w.rgap=0; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else { w.rgap=(w.rgap||0)+dt; if(w.rgap>.4) w.res=0; } }
     // 見つかっているか（2＝追われている／1＝近くで探されている）
     for(const r of run){ let al=0; if(r.st==='free'&&!r.away){ for(const o of oni){ const d=Math.hypot(o.x-r.x,o.z-r.z), dy=Math.abs(o.y-r.y);
           if(r.hid<0){ if(o.ai){ if(o.mode==='chase'&&o.tid===r.id) al=2; else if((o.mode==='search'||o.mode==='lurk')&&o.last&&Math.hypot(o.last.x-r.x,o.last.z-r.z)<10&&dy<2) al=Math.max(al,1); else if(d<9&&dy<2) al=Math.max(al,1); }
@@ -2044,10 +2046,18 @@ addEventListener('keydown',e=>{ if(e.code==='KeyC'&&GAMEMODE&&!e.repeat) setCrou
 el('runBtn').addEventListener('click',()=>{ if(CROUCH&&IN.run) setCrouch(false); });
 /* ---------- 救出（長押し3秒） ---------- */
 let rescueHold=false, rescueId=-1;
-function nearWax(){ if(!V||myRole!=='run'||HIDDEN) return null; let best=null,bd=1.6; V.pl.forEach(q=>{ if(q[0]===net.myId||!q[7]) return; const d=Math.hypot(q[1]-P.x,q[3]-P.z); if(d<bd&&Math.abs(q[2]-P.y)<1.2){ bd=d; best=q; } }); return best; }
+function nearWax(){ if(!V||myRole!=='run'||HIDDEN) return null; let best=null,bd=1.8; V.pl.forEach(q=>{ if(q[0]===net.myId||!q[7]) return; const d=Math.hypot(q[1]-P.x,q[3]-P.z); if(d<bd&&Math.abs(q[2]-P.y)<1.2){ bd=d; best=q; } }); return best; }
 function rescueTarget(){ if(!rescueHold) return -1; const w=nearWax(); if(!w||w[0]!==rescueId){ rescueHold=false; return -1; } return rescueId; }
-{ const b=el('oniRescue'); const down=e=>{ e.preventDefault(); const w=nearWax(); if(!w) return; rescueHold=true; rescueId=w[0]; b.classList.add('on'); }; const up=()=>{ rescueHold=false; b.classList.remove('on'); };
-  b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); b.addEventListener('pointerleave',up);
+{ const b=el('oniRescue'); let tid=null;
+  const down=e=>{ if(e.cancelable) e.preventDefault(); const w=nearWax(); if(!w) return; rescueHold=true; rescueId=w[0]; b.classList.add('on'); };
+  const up=e=>{ if(e&&e.cancelable) e.preventDefault(); rescueHold=false; b.classList.remove('on'); };
+  // スマホ：長押しで出る文字選択やメニューに指を取られないよう、タッチを直接受ける
+  b.addEventListener('touchstart',e=>{ tid=e.changedTouches[0].identifier; down(e); },{passive:false});
+  b.addEventListener('touchend',e=>{ for(const t of e.changedTouches) if(t.identifier===tid){ tid=null; up(e); } },{passive:false});
+  b.addEventListener('touchcancel',e=>{ tid=null; up(e); },{passive:false});
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+  b.addEventListener('pointerdown',e=>{ if(e.pointerType==='touch') return; down(e); try{ b.setPointerCapture(e.pointerId); }catch(_){} });
+  b.addEventListener('pointerup',e=>{ if(e.pointerType==='touch') return; up(e); }); b.addEventListener('pointercancel',e=>{ if(e.pointerType==='touch') return; up(e); });
   addEventListener('keydown',e=>{ if(e.code==='KeyR'&&!e.repeat&&GAMEMODE){ const w=nearWax(); if(w){ rescueHold=true; rescueId=w[0]; } } }); addEventListener('keyup',e=>{ if(e.code==='KeyR') rescueHold=false; }); }
 /* ---------- 物陰（しゃがめば隠れる低い障害物） ---------- */
 const OBST=(function(){ const B={wood:new Batch(BK.wood.mat,1.2),bark:new Batch(M.bark,2),rock:new Batch(M.stoneD,2.4),hedge:new Batch(M.hedge,1),iron:new Batch(M.iron,1)}; let n=0;
@@ -2147,7 +2157,7 @@ GAMESTEP=(dt,t,moving)=>{ if(!GAMEMODE) return; myMoving=moving;
   if(iEsc&&!window._escShown){ window._escShown=1; say('脱出','銀の鍵で森の出口を開けた！ ここからは、まだ逃げている仲間の視点で見守れます（◀ ▶で切り替え）',6); SND.chime(); }
   el('oniGoal').textContent=myRole==='oni'?'迷い人を全員捕まえろ。鍵を持つ者を出口へ行かせるな':iEsc?'脱出成功！ 仲間の様子を観戦中':iamWax?'':iKey?'銀の鍵を持っている！ 北の「森の出口」へ':'館のどこかにある「銀の鍵」を探せ（地図に◆）';
   el('oniGoal').classList.toggle('key',!!iKey);
-  const wN=nearWax(); const rb=el('oniRescue'); rb.hidden=!wN||!!iamWax||!!iEsc; if(wN){ const R0=ROSTER.find(p=>p.id===wN[0]); rb.querySelector('b').textContent='長押しで助ける：'+(R0?R0.n:''); rb.querySelector('i').style.width=Math.min(100,(wN[8]||0)/3*100)+'%'; }
+  const wN=nearWax(); const rb=el('oniRescue'); const hideRb=!wN||!!iamWax||!!iEsc; if(rb.hidden!==hideRb) rb.hidden=hideRb; if(hideRb&&rescueHold){ rescueHold=false; rb.classList.remove('on'); } if(wN){ const R0=ROSTER.find(p=>p.id===wN[0]); const tx='長押しで助ける：'+(R0?R0.n:''); const bb=rb.querySelector('b'); if(bb.textContent!==tx) bb.textContent=tx; rb.querySelector('i').style.width=Math.min(100,(wN[8]||0)/3*100)+'%'; }
   if(meA){ if(!meA.keyM){ meA.keyM=keyMesh(); meA.keyM.scale.setScalar(.7); meA.keyM.position.set(.3,1.0,-.15); meA.av.g.add(meA.keyM); } meA.keyM.visible=!!iKey; meA.av.g.visible=!HIDDEN&&!iEsc; meA.av.g.scale.y=CROUCH?.66:1; }
   el('oniCrouch').hidden=myRole!=='run'||!!iamWax||!!iEsc||!!HIDDEN; if((iamWax||iEsc||HIDDEN)&&CROUCH) setCrouch(false);
   el('oniWax').hidden=!iamWax; if(iamWax) el('oniWaxBar').style.width=Math.min(100,mine[8]/3*100)+'%';
