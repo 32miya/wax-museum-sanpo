@@ -334,6 +334,8 @@ body.ingame #map .note{text-align:center}
 <h3>逃げる側の勝ち</h3><p>森の入口から出発し、館のどこかにある「銀の鍵」を拾って、北の「森の出口」までたどり着けば脱出。ひとりでも脱出すれば逃げる側の勝ち。</p>
 <h3>鬼の勝ち</h3><p>誰も脱出させずに全員を捕まえるか、時間切れまで脱出させなければ鬼の勝ち。鬼は館の中と森に最低2体。</p>
 <h3>身を守る</h3><ul><li>隠れ場所（箪笥・棺・カーテンなど）に入っている間は、絶対に捕まらない</li><li>「しゃがむ」と、木箱や倒木など低い物の陰に体が隠れる。霧の中でも見えにくくなる</li><li>画面が<b style="color:#ff5050">赤</b>＝見つかって追われている／<b style="color:#ffd040">黄</b>＝近くで探されている</li></ul>
+<h3>毎回ちがう鬼</h3><p>AIの鬼は、顔ぶれ・出てくる場所・性格が毎回かわる（始まりに「今夜の鬼」で発表）。おまかせのときは、途中で館の地下や霧の奥から鬼がもう1体あらわれることも。</p><ul><li><b>しつこい追跡</b>…見失っても逃げた方向の先まで追い、近くの隠れ場所をのぞく</li><li><b>待ち伏せ</b>…銀の鍵・出口・捕まえた蝋人形のそばでじっと待つ</li><li><b>見回り</b>…決まった順路をぐるぐる回る（順路は毎回ちがう）</li><li><b>地獄耳</b>…見えなくても近くの足音を聞きつける。しゃがみ歩きなら聞こえない</li><li><b>気まぐれ</b>…行き先がでたらめで、ときどき急に駆け出す</li></ul>
+<p>ひとり用で鬼を選んだときのCPUの迷い人にも性格がある：慎重（すぐ隠れ、しゃがみ歩き）・大胆（鍵へ一直線）・仲間思い（真っ先に救出）・遠回り（脇の獣道を通る）・気まぐれ（寄り道して一休み）。</p>
 <h3>捕まったら</h3><p>蝋人形にされて動けなくなる。持っていた鍵は元の場所に戻る。仲間がそばで「助ける」を3秒長押しすると復活（手を離すと0から）。</p>
 <h3>脱出したら</h3><p>まだ逃げている仲間の視点で観戦できる（◀ ▶で切り替え）。</p>
 <h3>操作</h3><ul><li>左のパッドで移動、右のパッドか画面のドラッグで見回す</li><li>「走る」は走れる時間（白いバー）に限りがある</li><li>パソコン：WASDで移動、Shiftで走る、Cでしゃがむ、Eで隠れる、Rを長押しで助ける</li></ul>
@@ -1760,29 +1762,43 @@ function outdoorFogged(b){ return !inR(FOOT,b.x,b.z,1)&&b.y<2; }
 
 /* ---------- 主：ゲーム進行 ---------- */
 const OSPD=[5.0,4.6,4.4,5.2,5.4,4.3].map(v=>v*OSCALE); // 鬼ごとの全力
+// AIの鬼の性格（毎回ランダムに割り当てる）
+const OTYPE={ chase:{nm:'しつこい追跡'}, ambush:{nm:'待ち伏せ'}, round:{nm:'見回り'}, ear:{nm:'地獄耳'}, whim:{nm:'気まぐれ'} };
+// CPUの逃げ手の性格
+const RTYPE={ careful:{nm:'慎重'}, bold:{nm:'大胆'}, buddy:{nm:'仲間思い'}, detour:{nm:'遠回り'}, whim:{nm:'気まぐれ'} };
+function nearNode(x,y,z){ let b=null,bd=1e9; for(const n of NAV.main){ const d=Math.hypot(n.x-x,n.z-z)+Math.abs(n.y-y)*4; if(d<bd){ bd=d; b=n; } } return b; }
 const KEYSPOTS=[[-16,H1,18,'老人の書斎'],[-16,H1,-3,'開かずの一室'],[16,H1,-6,'肖像画の間'],[8,H1,27.5,'衣装部屋'],[9.5,0,-6,'晩餐の間'],[14,0,15.2,'蝋の工房'],[-15,0,-8,'蝋人形の回廊'],[3.5,0,-8,'儀式の間'],[16,-4,-6,'地下の保管庫'],[8.6,-4,13.5,'地下の保管庫']];
 function newGame(){ const pl=lobby.map((L,i)=>({id:L.id,n:L.n,role:L.role,ch:L.ch,ai:false}));
   const humanOni=pl.filter(p=>p.role==='oni').length, runners=pl.filter(p=>p.role==='run').length;
   let ai=SET.ai==='auto'?(humanOni?0:Math.max(2,Math.ceil(runners/3))):+SET.ai; ai=Math.max(ai,2-humanOni); /* 鬼は最低2体 */ const used=new Set(pl.filter(p=>p.role==='oni').map(p=>p.ch));
-  for(let k=0;k<ai;k++){ let ch=k%6; for(let c=0;c<6;c++){ if(!used.has((k*2+c)%6)){ ch=(k*2+c)%6; break; } } used.add(ch); pl.push({id:1000+k,n:CH.DEMONS[ch].name,role:'oni',ch,ai:true}); }
-  if(!pl.some(p=>p.role==='run')) { pl.forEach(p=>{}); }
-  if(net.solo&&pl.some(q=>q.role==='oni'&&!q.ai)){ const NM=['迷い人イチ','迷い人ニノ','迷い人サン','迷い人ヨツ','迷い人イツ','迷い人ムツ']; for(let k=0;k<6;k++) pl.push({id:2000+k,n:NM[k],role:'run',ch:k%4,ai:true}); }
-  const RS=[[0,188],[-2,186],[2,186],[-1,184],[1,190],[-3,189],[3,189],[0,185]], OS=[[0,2],[-12,8],[12,8],[0,-4]], FS=[[-58,84],[60,40],[-44,112],[46,74],[-62,52],[58,10]].sort(()=>Math.random()-.5); let ri=0,oi=0,mi=0,fi=0;
-  // 鬼は館の中と森に交互に配る（1体目＝館、2体目＝森、…）
-  pl.forEach(p=>{ let s; if(p.role==='run') s=RS[ri++%RS.length]; else { const k=oi++; if(k%2===0){ s=OS[mi++%OS.length]; p.home='house'; } else { s=FS[fi++%FS.length]; p.home='forest'; } } p.x=s[0]; p.z=s[1]; p.y=terrH(s[0],s[1]); p.yaw=p.role==='run'?0:PI; p.mv=0; p.hid=-1; p.st='free'; p.res=0; p.key=-1; p.rs=-1; p.spd=p.role==='oni'?OSPD[p.ch]:4.6;
-    if(p.ai&&p.role==='run'){ p.plan=null; p.sta=6; p.reT=0; p.wait=R(0,8); const W=[[-44,112],[46,74],[-58,52],[58,46],[-26,132],[34,128],[0,90]]; if(Math.random()<.75){ const w=W[Math.floor(Math.random()*W.length)]; p.first={x:w[0]+R(-3,3),z:w[1]+R(-3,3)}; } }
-    if(p.ai&&p.role==='oni'){ p.mode='wait'; p.goal=null; p.D=null; p.reT=0; p.last=null; p.checks=[]; p.cool=0; } });
+  // 鬼の顔ぶれは毎回ランダム（人が選んだ鬼とは重ならない）
+  const pool=[0,1,2,3,4,5].filter(c=>!used.has(c)).sort(()=>Math.random()-.5);
+  // 途中から現れる鬼：おまかせで人の鬼がいないとき、半分の確率で1体ふえる
+  const late=SET.ai==='auto'&&!humanOni&&Math.random()<.5&&pool.length>ai;
+  const OT=Object.keys(OTYPE).sort(()=>Math.random()-.5);
+  for(let k=0;k<ai+(late?1:0);k++){ const ch=pool.length?pool[k%pool.length]:k%6; const q={id:1000+k,n:CH.DEMONS[ch].name,role:'oni',ch,ai:true,ot:OT[k%OT.length]}; if(late&&k===ai){ q.dormT=R(120,Math.min(300,SET.min*60*.45)); } pl.push(q); }
+  if(net.solo&&pl.some(q=>q.role==='oni'&&!q.ai)){ const NM=['イチ','ニノ','サン','ヨツ','イツ','ムツ','ナナ','ヤツ','トオ'].sort(()=>Math.random()-.5); const RT=Object.keys(RTYPE).sort(()=>Math.random()-.5); for(let k=0;k<6;k++){ const rt=RT[k%RT.length]; pl.push({id:2000+k,n:NM[k]+'〈'+RTYPE[rt].nm+'〉',role:'run',ch:Math.floor(Math.random()*4),ai:true,rt}); } }
+  // 出現場所も毎回ちがう
+  const RS=[[0,188],[-2,186],[2,186],[-1,184],[1,190],[-3,189],[3,189],[0,185]], OS=[[0,2],[-12,8],[12,8],[0,-4],[8,14],[0,20],[-14,0],[14,0]].sort(()=>Math.random()-.5), FS=[[-58,84],[60,40],[-44,112],[46,74],[-62,52],[58,10],[-30,96],[34,104],[-60,20],[62,-20]].sort(()=>Math.random()-.5); let ri=0,oi=0,mi=0,fi=0;
+  const houseFirst=Math.random()<.5;
+  // 鬼は館の中と森に交互に配る（どちらから配るかは毎回ちがう）
+  pl.forEach(p=>{ let s; if(p.role==='run') s=RS[ri++%RS.length]; else { const k=oi++; if((k%2===0)===houseFirst){ s=OS[mi++%OS.length]; p.home='house'; } else { s=FS[fi++%FS.length]; p.home='forest'; } if(p.dormT){ p.home=Math.random()<.5?'house':'forest'; p.spawn=p.home==='house'?[8.6,13.5]:FS[fi++%FS.length]; s=[0,-200]; } } p.x=s[0]; p.z=s[1]; p.y=p.dormT?-80:terrH(s[0],s[1]); p.yaw=p.role==='run'?0:PI; p.mv=0; p.hid=-1; p.st='free'; p.res=0; p.key=-1; p.rs=-1; p.spd=p.role==='oni'?OSPD[p.ch]:4.6;
+    if(p.ai&&p.role==='run'){ p.plan=null; p.sta=6; p.reT=0; p.wait=p.rt==='bold'?R(0,2):R(0,8); const W=[[-44,112],[46,74],[-58,52],[58,46],[-26,132],[34,128],[0,90]]; if(Math.random()<(p.rt==='detour'?1:.75)){ const w=W[Math.floor(Math.random()*W.length)]; p.first={x:w[0]+R(-3,3),z:w[1]+R(-3,3)}; } p.whimT=R(25,50); }
+    if(p.ai&&p.role==='oni'){ p.mode='wait'; p.goal=null; p.D=null; p.reT=0; p.last=null; p.checks=[]; p.cool=0; p.idle=0; p.route=null; p.ri=0; p.dashT=R(12,25); p.hearT=0; } });
   const nRun=Math.max(1,pl.filter(p=>p.role==='run').length); const idx=KEYSPOTS.map((k,i)=>i).sort(()=>Math.random()-.5).slice(0,Math.min(KEYSPOTS.length,nRun+1));
   G={pl,t:SET.min*60,pre:10,over:false,evs:[],keys:idx.map(i=>({i,x:KEYSPOTS[i][0],y:KEYSPOTS[i][1],z:KEYSPOTS[i][2],by:-1}))};
   // AIの鬼のうち1体は、はじめに森の入口の方へ道の半分まで出てきて、館へ戻る
   // 館の鬼は、動き出してから30秒は館の中だけを徘徊する
   G.pl.forEach(p=>{ if(p.ai&&p.home==='house'){ p.houseT=30; } }); G.hunter=null;
   if(G.pl.some(p=>p.ai)&&!NAV) buildNav();
+  // 鬼の出現位置を、歩ける床の上にそろえる
+  if(NAV) G.pl.forEach(p=>{ if(p.ai&&p.role==='oni'&&!p.dormT){ const n=nearNode(p.x,p.home==='house'?0:terrH(p.x,p.z),p.z); if(n){ p.x=n.x; p.y=n.y; p.z=n.z; } } });
   return G; }
 function hostEvent(m){ broadcast({t:'ev',m}); onEv(m); }
 function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.myId); if(me0){ me0.x=P.x; me0.y=P.y; me0.z=P.z; me0.yaw=P.yaw; me0.mv=myMoving?1:0; if(me0.st==='free'){ me0.hid=HIDDEN?HIDES.indexOf(HIDDEN.h):-1; me0.rs=rescueTarget(); me0.cr=CROUCH?1:0; } }
-  if(G.pre>0){ G.pre-=dt; if(G.pre<=0) hostEvent('鬼が動き出した！ 館の中と森に、鬼がいる……'); }
+  if(G.pre>0){ G.pre-=dt; if(G.pre<=0){ const L=G.pl.filter(p=>p.ai&&p.role==='oni'&&!p.dormT).map(p=>p.n+'〈'+OTYPE[p.ot].nm+'〉'); hostEvent('鬼が動き出した！'+(L.length?' 今夜の鬼：'+L.join('・'):' 館の中と森に、鬼がいる……')); } }
   else G.t-=dt;
+  if(G.pre<=0&&G.pl.some(p=>p.dormT>0)){ G.pl.forEach(p=>{ if(p.dormT>0){ p.dormT-=dt; if(p.dormT<=0){ const sp=p.spawn, n=nearNode(sp[0],p.home==='house'?-4:terrH(sp[0],sp[1]),sp[1]); if(n){ p.x=n.x; p.y=n.y; p.z=n.z; } p.houseT=0; p.mode='patrol'; p.goal=null; p.tn=null; hostEvent((p.home==='house'?'館の地下で、何かが目を覚ました……':'霧の奥から、もう一体の鬼が現れた……')+' '+p.n+'〈'+OTYPE[p.ot].nm+'〉'); } } }); }
   // AI鬼
   G.pl.forEach(p=>{ if(p.ai) (p.role==='oni'?aiStep:runStep)(p,dt); });
   if(G.pre<=0){
@@ -1810,64 +1826,100 @@ function catchRun(r,o){ if(r.key>=0){ const k=G.keys[r.key]; if(k){ k.by=-1; } r
 function hostSearch(){}
 function endGame(win){ if(G.over) return; G.over=true; const res={t:'end',win,pl:G.pl.map(p=>({n:p.n,role:p.role,st:p.st,ai:p.ai}))}; G.endMsg=res; broadcast(res); onEnd(res); }
 // AIの動き
-function aiStep(p,dt){ if(G.pre>0||!NAV) return; p.cool-=dt; p.reT-=dt;
+function aiStep(p,dt){ if(G.pre>0||!NAV||p.dormT>0) return; p.cool-=dt; p.reT-=dt; const T=p.ot||'chase';
   const here={x:p.x,y:p.y,z:p.z};
   // 見える逃げ手
   let tgt=null,td=1e9; for(const r of G.pl){ if(r.role!=='run'||r.st!=='free'||r.away) continue; if(r.hid>=0){ if(p.mode==='chase'&&p.tid===r.id&&Math.hypot(r.x-p.x,r.z-p.z)<9){ // 目の前で隠れた
-        p.mode='lurk'; p.lurkT=R(8,14); p.last={x:HIDES[r.hid].ex,y:HIDES[r.hid].y,z:HIDES[r.hid].ez}; p.reT=0; } continue; }
+        p.mode='lurk'; p.lurkT=T==='ambush'?R(14,24):T==='whim'?R(3,7):R(8,14); p.last={x:HIDES[r.hid].ex,y:HIDES[r.hid].y,z:HIDES[r.hid].ez}; p.reT=0; } continue; }
     if(sees(here,r)){ const d=Math.hypot(r.x-p.x,r.z-p.z); if(d<td){ td=d; tgt=r; } } }
-  if(tgt){ p.mode='chase'; p.tid=tgt.id; p.last={x:tgt.x,y:tgt.y,z:tgt.z}; }
-  else if(p.mode==='chase'){ p.mode='search'; p.reT=0; p.checks=[]; }
+  // 地獄耳：見えなくても、近くを走る足音（しゃがみ歩きは聞こえない）を聞きつける
+  if(!tgt&&T==='ear'&&p.mode!=='chase'){ p.hearT-=dt; if(p.hearT<=0){ p.hearT=.5; for(const r of G.pl){ if(r.role!=='run'||r.st!=='free'||r.away||r.hid>=0||!r.mv||r.cr) continue; const d=Math.hypot(r.x-p.x,r.z-p.z); if(d<11&&Math.abs(r.y-p.y)<3){ p.mode='search'; p.last={x:r.x+R(-1.5,1.5),y:r.y,z:r.z+R(-1.5,1.5)}; p.reT=0; p.tn=null; break; } } } }
+  if(tgt){ if(p.last&&p.mode==='chase'&&p.tid===tgt.id){ p.vx=(tgt.x-p.last.x)/Math.max(dt,.016); p.vz=(tgt.z-p.last.z)/Math.max(dt,.016); } p.mode='chase'; p.tid=tgt.id; p.last={x:tgt.x,y:tgt.y,z:tgt.z}; p.lostT=0; }
+  else if(p.mode==='chase'){ p.mode='search'; p.reT=0; p.checks=[];
+    // しつこい追跡：見失った方向の先まで追いかける
+    if(T==='chase'&&p.last&&p.vx!=null){ const v=Math.hypot(p.vx,p.vz)||1, ux=p.vx/v, uz=p.vz/v; for(let L=7;L>=2;L--){ const n=nearNode(p.last.x+ux*L,p.last.y,p.last.z+uz*L); if(n&&Math.hypot(n.x-p.last.x,n.z-p.last.z)<L+2&&Math.abs(n.y-p.last.y)<1.5){ p.last={x:n.x,y:n.y,z:n.z}; break; } } }
+    // 気まぐれ：近くの隠れ場所を順にのぞく
+    if(T==='whim'||T==='chase'){ p.checks=HIDES.map((h,i)=>i).filter(i=>Math.hypot(HIDES[i].ex-p.last.x,HIDES[i].ez-p.last.z)<9&&Math.abs(HIDES[i].y-p.last.y)<1.5).sort(()=>Math.random()-.5).slice(0,T==='chase'?3:2); } }
   // 目的地
   let goal=null, spd=2.3;
-  if(p.mode==='chase'){ goal=p.last; spd=p.spd*.95; }
+  if(p.mode==='chase'){ goal=p.last; spd=p.spd*(T==='chase'?.98:.95); }
   else if(p.mode==='lurk'){ goal=p.last; spd=2.4*OSCALE; p.lurkT-=dt; if(p.lurkT<=0){ p.mode='patrol'; p.goal=null; } }
-  else if(p.mode==='search'){ spd=3.4*OSCALE; { goal=p.last; if(!p.last||Math.hypot(p.last.x-p.x,p.last.z-p.z)<1.5){ p.mode='patrol'; p.goal=null; } } }
+  else if(p.mode==='search'){ spd=3.4*OSCALE; goal=p.last; if(!p.last||Math.hypot(p.last.x-p.x,p.last.z-p.z)<1.5){ if(p.checks&&p.checks.length){ const h=HIDES[p.checks.shift()]; p.last={x:h.ex,y:h.y,z:h.ez}; goal=p.last; p.reT=0; } else { p.mode='patrol'; p.goal=null; if(T==='ambush'){ p.idle=R(3,6); } } } }
   if(p.houseT>0){ p.houseT-=dt; if(p.houseT<=0&&p.mode==='patrol'){ p.goal=null; } }
-  if(p.mode==='hunt'){ p.huntT-=dt; goal=p.goal; spd=3.4*OSCALE; if(p.huntT<=0||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<3){ p.mode='return'; p.goal={x:R(-2,2),y:0,z:36}; } }
-  if(p.mode==='return'){ goal=p.goal; spd=2.4*OSCALE; if(Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<3){ p.mode='patrol'; p.goal=null; } }
-  if(p.mode==='patrol'||p.mode==='wait'){ // 鍵を持つ者を優先して追う
-    const kr=G.pl.find(r=>r.role==='run'&&r.st==='free'&&r.key>=0&&!r.away&&r.hid<0&&Math.hypot(r.x-p.x,r.z-p.z)<30); if(kr&&Math.random()<.02){ p.goal={x:kr.x,y:kr.y,z:kr.z}; } p.mode='patrol'; if((!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5)&&p.home==='forest'&&Math.random()<.9){ const T=TRAILS[Math.floor(Math.random()*TRAILS.length)], q=T[Math.floor(Math.random()*T.length)]; if(q[1]<GB.z1-4&&q[1]>GB.z0+4&&!inR(ESTATE,q[0],q[1],2)){ p.goal={x:q[0],y:terrH(q[0],q[1]),z:q[1]}; p.reT=0; } } // 森の鬼は獣道を中心に見回る
-    if((!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5)&&p.houseT>0){ const H=NAV.house||(NAV.house=NAV.main.filter(n=>inR(FOOT,n.x,n.z,-.6))); const n=H[Math.floor(Math.random()*H.length)]; if(n){ p.goal={x:n.x,y:n.y,z:n.z}; p.reT=0; } } // 館の中だけ
-    if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5){ const rr=Math.random(); if(rr<.35){ const i=Math.floor(Math.random()*HIDES.length), h=HIDES[i]; p.goal={x:h.ex,y:h.y,z:h.ez}; } else if(rr<.6){ const k=G.keys[Math.floor(Math.random()*G.keys.length)]; p.goal=Math.random()<.5&&k?{x:k.x,y:k.y,z:k.z}:{x:EXIT.x+R(-6,6),y:0,z:EXIT.z+R(4,12)}; } else { const n=NAV.main[Math.floor(Math.random()*NAV.main.length)]; p.goal={x:n.x,y:n.y,z:n.z}; } p.reT=0; }
-    goal=p.goal; spd=2.4*OSCALE; }
+  if(p.mode==='patrol'||p.mode==='wait'){ p.mode='patrol';
+    // 待ち伏せ：着いた場所でしばらくじっと待つ
+    if(p.idle>0){ p.idle-=dt; p.mv=0; return; }
+    // 鍵を持つ者を優先して追う
+    const kr=G.pl.find(r=>r.role==='run'&&r.st==='free'&&r.key>=0&&!r.away&&r.hid<0&&Math.hypot(r.x-p.x,r.z-p.z)<30); if(kr&&Math.random()<(T==='chase'?.04:.02)){ p.goal={x:kr.x,y:kr.y,z:kr.z}; }
+    const arrived=!p.goal||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<1.5;
+    if(arrived&&p.goal&&T==='ambush'&&!p.idleDone){ p.idle=R(5,10); p.idleDone=true; p.mv=0; return; }
+    if(arrived){ p.idleDone=false; p.goal=pickPatrol(p,T); p.reT=0; }
+    goal=p.goal; spd=(T==='round'?2.7:T==='ambush'?2.2:2.4)*OSCALE; }
+  // 気まぐれ：ときどき急に駆け出す
+  if(T==='whim'){ p.dashT-=dt; if(p.dashT<0){ if(p.mode!=='chase') spd=Math.max(spd,p.spd*.85); if(p.dashT<-3) p.dashT=R(12,25); } }
   if(!goal) return;
   navMove(p,goal,spd,dt,!!(p.mode==='chase'&&tgt)); }
+// 見回り先の選び方（性格ごと）
+function pickR(a){ return a[Math.floor(Math.random()*a.length)]; }
+function pickPatrol(p,T){ const node=n=>n&&{x:n.x,y:n.y,z:n.z};
+  if(p.houseT>0){ const H=NAV.house||(NAV.house=NAV.main.filter(n=>inR(FOOT,n.x,n.z,-.6))); return node(pickR(H)); } // 館の中だけ
+  if(p.home==='forest'&&T!=='ambush'&&Math.random()<(T==='round'?.5:.8)){ for(let k=0;k<6;k++){ const TR=pickR(TRAILS), q=pickR(TR); if(q[1]<GB.z1-4&&q[1]>GB.z0+4&&!inR(ESTATE,q[0],q[1],2)) return {x:q[0],y:terrH(q[0],q[1]),z:q[1]}; } } // 森の鬼は獣道を中心に見回る
+  if(T==='ambush'){ // 鍵・出口・捕まえた蝋人形のそばで待つ
+    const wax=G.pl.filter(q=>q.role==='run'&&q.st==='wax'); const free=G.keys.filter(k=>k.by<0); const r=Math.random();
+    if(wax.length&&r<.4){ const w=pickR(wax); return node(nearNode(w.x+R(-5,5),w.y,w.z+R(-5,5))); }
+    if(free.length&&r<.75){ const k=pickR(free); return node(nearNode(k.x+R(-3,3),k.y,k.z+R(-3,3))); }
+    if(G.pl.some(q=>q.role==='run'&&q.key>=0&&q.st==='free')||r<.9) return {x:EXIT.x+R(-8,8),y:0,z:EXIT.z+R(4,14)};
+    return node(pickR(NAV.main)); }
+  if(T==='round'){ // 決まった順路をぐるぐる回る（順路は毎回ちがう）
+    if(!p.route){ const pts=KEYSPOTS.map(k=>({x:k[0],y:k[1],z:k[2]})).concat([{x:0,y:0,z:36},{x:EXIT.x,y:0,z:EXIT.z+8},{x:-40,y:0,z:100},{x:40,y:0,z:70}]).sort(()=>Math.random()-.5).slice(0,7); p.route=pts.map(q=>node(nearNode(q.x,q.y,q.z))).filter(Boolean); p.ri=0; }
+    const g=p.route[p.ri%p.route.length]; p.ri++; return g; }
+  const rr=Math.random(); // しつこい追跡・地獄耳・気まぐれ
+  if(rr<(T==='whim'?.5:.35)){ const h=pickR(HIDES); return {x:h.ex,y:h.y,z:h.ez}; }
+  if(rr<.6){ const k=pickR(G.keys); return Math.random()<.5&&k?{x:k.x,y:k.y,z:k.z}:{x:EXIT.x+R(-6,6),y:0,z:EXIT.z+R(4,12)}; }
+  return node(pickR(NAV.main)); }
 
 /* ---------- CPUの逃げ手（ひとり用で鬼を選んだとき） ---------- */
 function freeSpot(i){ return !G.pl.some(q=>q.role==='run'&&q.hid===i); }
 // 救出に行く相手：鍵を持っていないCPUは、捕まった仲間ごとに近い順で2人まで（距離は問わない）。鍵を持ったCPUは20m以内なら寄り道
 function rescueFor(p){ const wax=G.pl.filter(q=>q.role==='run'&&q.st==='wax'); if(!wax.length) return null; const d=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z)+Math.abs(a.y-b.y)*6;
-  if(p.key>=0) return wax.find(w=>d(w,p)<20)||null;
+  if(p.rt==='buddy'){ wax.sort((a,b)=>d(a,p)-d(b,p)); return p.key>=0?(wax.find(w=>d(w,p)<60)||null):wax[0]; } // 仲間思い：誰が捕まっても真っ先に助けに行く
+  if(p.key>=0) return wax.find(w=>d(w,p)<(p.rt==='bold'?10:20))||null;
   wax.sort((a,b)=>d(a,p)-d(b,p));
-  for(const w of wax){ const c=G.pl.filter(q=>q.ai&&q.role==='run'&&q.st==='free'&&q.hid<0&&q.key<0).sort((a,b)=>d(a,w)-d(b,w)).slice(0,2); if(c.includes(p)) return w; }
+  for(const w of wax){ const c=G.pl.filter(q=>q.ai&&q.role==='run'&&q.st==='free'&&q.hid<0&&q.key<0&&q.rt!=='buddy').sort((a,b)=>d(a,w)-d(b,w)).slice(0,2); if(c.includes(p)) return w; }
   return null; }
-function runStep(p,dt){ if(p.st!=='free'||!NAV){ p.mv=0; return; } p.pT=(p.pT||0)-dt; p.sta=p.sta==null?6:p.sta;
-  const oni=G.pl.filter(q=>q.role==='oni'); let th=null,td=1e9; for(const o of oni){ const d=Math.hypot(o.x-p.x,o.z-p.z); if(d<td&&Math.abs(o.y-p.y)<2&&(d<5||(d<15&&sees(p,o)))){ td=d; th=o; } }
+function runStep(p,dt){ if(p.st!=='free'||!NAV){ p.mv=0; p.cr=0; return; } p.pT=(p.pT||0)-dt; p.sta=p.sta==null?6:p.sta; const RT=p.rt||'careful';
+  const SEE=RT==='careful'?19:RT==='bold'?12:15, NEAR=RT==='careful'?7:5;
+  const oni=G.pl.filter(q=>q.role==='oni'&&!(q.dormT>0)); let th=null,td=1e9; for(const o of oni){ const d=Math.hypot(o.x-p.x,o.z-p.z); if(d<td&&Math.abs(o.y-p.y)<2&&(d<NEAR||(d<SEE&&sees(p,o)))){ td=d; th=o; } }
+  // 慎重：鬼が近くにいそうなときはしゃがんで歩く
+  p.cr=(RT==='careful'&&!th&&oni.some(o=>Math.hypot(o.x-p.x,o.z-p.z)<20&&Math.abs(o.y-p.y)<2.5))?1:0;
   // 隠れている
-  if(p.hid>=0){ p.mv=0; p.hideT-=dt; const near=oni.some(o=>Math.hypot(o.x-p.x,o.z-p.z)<12&&Math.abs(o.y-p.y)<2.5); if(p.hideT<=0&&!near){ const h=HIDES[p.hid]; p.hid=-1; p.x=h.ex; p.z=h.ez; p.y=h.y; p.plan=null; } return; }
+  if(p.hid>=0){ p.mv=0; p.hideT-=dt; p.cr=0; const near=oni.some(o=>Math.hypot(o.x-p.x,o.z-p.z)<(RT==='bold'?7:RT==='careful'?16:12)&&Math.abs(o.y-p.y)<2.5); if(p.hideT<=0&&!near){ const h=HIDES[p.hid]; p.hid=-1; p.x=h.ex; p.z=h.ez; p.y=h.y; p.plan=null; } return; }
   let goal=null, run=false;
   if(G.pre<=0&&th){ // 鬼が見える
-    if(!p.plan||p.plan.t!=='hide'&&p.plan.t!=='flee'||p.pT<=0){ p.pT=1.2;
-      let best=-1,bd=1e9; HIDES.forEach((h,i)=>{ if(!freeSpot(i)||Math.abs(h.y-p.y)>1.2) return; const d=Math.hypot(h.ex-p.x,h.ez-p.z), dd=Math.hypot(h.ex-th.x,h.ez-th.z); if(d<9&&dd>d+1.5&&d<bd){ bd=d; best=i; } });
+    if(!p.plan||p.plan.t!=='hide'&&p.plan.t!=='flee'||p.pT<=0){ p.pT=1.2; const HR=RT==='careful'?14:RT==='bold'?(td<4?6:3):RT==='whim'?(Math.random()<.5?12:4):9;
+      let best=-1,bd=1e9; HIDES.forEach((h,i)=>{ if(!freeSpot(i)||Math.abs(h.y-p.y)>1.2) return; const d=Math.hypot(h.ex-p.x,h.ez-p.z), dd=Math.hypot(h.ex-th.x,h.ez-th.z); if(d<HR&&dd>d+1.5&&d<bd){ bd=d; best=i; } });
       if(best>=0) p.plan={t:'hide',i:best};
       else { let bn=null,bs=-1e9; for(let k=0;k<40;k++){ const n=NAV.main[Math.floor(Math.random()*NAV.main.length)]; const dm=Math.hypot(n.x-p.x,n.z-p.z); if(dm<10||dm>40) continue; const sc=Math.hypot(n.x-th.x,n.z-th.z)-dm*.5; if(sc>bs){ bs=sc; bn=n; } } if(bn) p.plan={t:'flee',x:bn.x,y:bn.y,z:bn.z}; } }
     run=true; }
-  else if(p.plan&&(p.plan.t==='flee'||p.plan.t==='hide')&&p.pT<=-4) p.plan=null; // 逃げ切ったら元の目的へ
-  if(!p.plan||p.plan.t==='key'||p.plan.t==='exit'||p.plan.t==='rescue'||p.plan.t==='roam'){
+  else if(p.plan&&(p.plan.t==='flee'||p.plan.t==='hide')&&!p.plan.rest&&p.pT<=-4) p.plan=null; // 逃げ切ったら元の目的へ
+  if(!p.plan||p.plan.t==='key'||p.plan.t==='exit'||p.plan.t==='rescue'||(p.plan.t==='roam'&&!p.plan.via)){
     const w=th?null:rescueFor(p);
     if(w) p.plan={t:'rescue',id:w.id};
     else if(p.key>=0) p.plan={t:'exit'};
     else { { let bk=null,bd=1e9; G.keys.forEach(k=>{ if(k.by>=0) return; const taken=G.pl.some(q=>q!==p&&q.ai&&q.role==='run'&&q.plan&&q.plan.t==='key'&&q.plan.k===k); const d=Math.hypot(k.x-p.x,k.z-p.z)+Math.abs(k.y-p.y)*8+(taken?60:0); if(d<bd){ bd=d; bk=k; } });
         if(bk) p.plan={t:'key',k:bk}; else if(!p.plan||p.plan.t!=='roam'){ const h=HIDES[Math.floor(Math.random()*HIDES.length)]; p.plan={t:'roam',x:h.ex,y:h.y,z:h.ez}; } } } }
+  // 気まぐれ：ときどき寄り道して、隠れ場所で一休み
+  if(RT==='whim'&&!th&&G.pre<=0&&p.plan&&p.plan.t!=='rescue'){ p.whimT-=dt; if(p.whimT<=0){ p.whimT=R(30,60); let bi=-1,bd=1e9; HIDES.forEach((h,i)=>{ if(!freeSpot(i)||Math.abs(h.y-p.y)>1.2) return; const d=Math.hypot(h.ex-p.x,h.ez-p.z); if(d<18&&d<bd){ bd=d; bi=i; } }); if(bi>=0) p.plan={t:'hide',i:bi,rest:1}; } }
+  // 遠回り：鍵や出口へは、いったん脇の獣道を経由する
+  if(RT==='detour'&&p.plan&&(p.plan.t==='key'||p.plan.t==='exit')&&!th){ const tg=p.plan.t==='exit'?{x:EXIT.x,z:EXIT.z}:{x:p.plan.k.x,z:p.plan.k.z}; const tk=p.plan.t+(p.plan.k?G.keys.indexOf(p.plan.k):''); if(p.via!==tk&&Math.hypot(tg.x-p.x,tg.z-p.z)>30){ p.via=tk; const side=Math.random()<.5?-1:1, mx=(p.x+tg.x)/2+side*R(30,45), mz=(p.z+tg.z)/2; const n=nearNode(Math.max(GB.x0+6,Math.min(GB.x1-6,mx)),terrH(mx,mz),mz); if(n&&!inR(ESTATE,n.x,n.z,2)) p.plan={t:'roam',x:n.x,y:n.y,z:n.z,via:1}; } }
   if(p.wait>0&&G.pre<=0){ p.wait-=dt; p.mv=0; return; }
   if(p.first&&!th&&p.key<0&&p.plan&&p.plan.t!=='rescue'){ p.plan={t:'roam',x:p.first.x,y:terrH(p.first.x,p.first.z),z:p.first.z}; if(Math.hypot(p.first.x-p.x,p.first.z-p.z)<4) p.first=null; } // まずは森の別々の道へ散らばる
   const P0=p.plan; p.rs=-1;
-  if(P0.t==='hide'){ const h=HIDES[P0.i]; goal={x:h.ex,y:h.y,z:h.ez}; run=true; if(Math.hypot(h.ex-p.x,h.ez-p.z)<1.2&&Math.abs(h.y-p.y)<1.2&&freeSpot(P0.i)){ p.hid=P0.i; p.hideT=R(10,22); p.mv=0; p.plan=null; return; } }
+  if(P0.t==='hide'){ const h=HIDES[P0.i]; goal={x:h.ex,y:h.y,z:h.ez}; run=true; if(Math.hypot(h.ex-p.x,h.ez-p.z)<1.2&&Math.abs(h.y-p.y)<1.2&&freeSpot(P0.i)){ p.hid=P0.i; p.hideT=P0.rest?R(5,10):RT==='careful'?R(16,30):RT==='bold'?R(5,10):R(10,22); p.mv=0; p.plan=null; return; } }
   else if(P0.t==='flee'){ goal=P0; run=true; if(Math.hypot(P0.x-p.x,P0.z-p.z)<2) p.plan=null; }
   else if(P0.t==='exit') goal={x:EXIT.x,y:0,z:EXIT.z};
   else if(P0.t==='key') goal={x:P0.k.x,y:P0.k.y,z:P0.k.z};
-  else if(P0.t==='roam'){ goal=P0; if(Math.hypot(P0.x-p.x,P0.z-p.z)<(p.first?4:1.5)){ p.plan=null; p.first=null; } }
+  else if(P0.t==='roam'){ goal=P0; if(Math.hypot(P0.x-p.x,P0.z-p.z)<(p.first||P0.via?4:1.5)){ p.plan=null; p.first=null; } }
   else if(P0.t==='rescue'){ const w=G.pl.find(q=>q.id===P0.id); if(!w||w.st!=='wax'){ p.plan=null; p.mv=0; return; }
     // 捕まった仲間のそばで鬼が待ち伏せしていたら、離れたところで様子を見る
     const guard=oni.some(o=>Math.hypot(o.x-w.x,o.z-w.z)<8&&Math.abs(o.y-w.y)<2); if(guard&&Math.hypot(w.x-p.x,w.z-p.z)<20){ p.mv=0; return; }
@@ -1875,12 +1927,15 @@ function runStep(p,dt){ if(p.st!=='free'||!NAV){ p.mv=0; return; } p.pT=(p.pT||0
   if(!goal){ p.mv=0; return; }
   if(G.pre>0) run=false;
   if(run&&p.sta>0){ p.sta=Math.max(0,p.sta-dt); } else p.sta=Math.min(6,p.sta+dt*.8);
-  const spd=(run?(p.sta>0?4.6:2.6):2.1)*GSPD;
+  if(RT==='bold'&&!run&&p.sta>4&&P0&&(P0.t==='key'||P0.t==='exit')) run=true; // 大胆：鬼がいなくても鍵へ走る
+  const spd=(p.cr&&!run?1.35:run?(p.sta>0?4.6:2.6):2.1)*GSPD;
   p.reT=(p.reT||0)-dt; const gid=P0.t+(P0.i!=null?P0.i:'')+(P0.id!=null?P0.id:'')+(P0.k?G.keys.indexOf(P0.k):'')+(P0.x!=null?Math.round(P0.x)+','+Math.round(P0.z):''); if(gid!==p.gid){ p.gid=gid; p.reT=0; p.tn=null; }
   navMove(p,goal,spd,dt,false); }
 
 // 網をたどって goal へ動く（鬼・CPUの逃げ手で共用）
 function navMove(p,goal,spd,dt,direct){ let dirx,dirz;
+  // 動けなくなっていないか見張る：5秒で1mも進まないときは、近くの歩ける点へ少しずらして行き先を選び直す
+  p.wd=(p.wd||0)+dt; if(p.wd>5){ if(p.wdp&&Math.hypot(p.x-p.wdp.x,p.z-p.wdp.z)<1&&Math.hypot(goal.x-p.x,goal.z-p.z)>2.5){ const C=NAV.main.filter(n=>{ const d=Math.hypot(n.x-p.x,n.z-p.z); return d>.6&&d<2.6&&Math.abs(n.y-p.y)<.6&&!blocked(n.x,n.z,n.y); }); const n=C[Math.floor(Math.random()*C.length)]; if(n){ p.x=n.x; p.z=n.z; p.y=n.y; } p.goal=null; p.D=null; p.tn=null; p.reT=0; if(p.role==='run'){ p.plan=null; } else if(p.mode!=='chase'){ p.mode='patrol'; p.checks=[]; } p.wd=0; p.wdp={x:p.x,z:p.z}; p.mv=0; return; } p.wd=0; p.wdp={x:p.x,z:p.z}; }
   if(direct){ dirx=goal.x-p.x; dirz=goal.z-p.z; }
   else { if(p.reT<=0||!p.D){ p.reT=.7; p.gn=NAV.near(goal.x,goal.y,goal.z); p.D=flow(p.gn); }
     // 網の点を一つずつたどる（毎回いちばん近い点を探し直すと行ったり来たりするため）
