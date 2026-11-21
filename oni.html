@@ -172,6 +172,7 @@ body.photo .place,body.photo #mini,body.photo .topbtns,body.photo #menu,body.pho
 .plist small{color:var(--mute);font-size:11px;margin-left:auto}.plist em{font-style:normal;font-size:10px;color:var(--shu2)}
 .sets{display:flex;gap:10px}.sets label{flex:1;display:grid;gap:4px;font-size:12px;color:var(--mute)}
 .lmsg{font-size:14px;line-height:1.7}
+.rotb{height:38px;font-size:13px;font-weight:400;color:var(--mute)}.rotb span{color:var(--ink);font-weight:700}
 .sis{margin-top:4px;padding-top:10px;border-top:1px solid var(--line)}.sis>b{display:block;font-size:11px;letter-spacing:.2em;color:var(--mute);font-weight:400;margin-bottom:6px}
 .sisr{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.sisr a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:6px 4px;border-radius:10px;border:1px solid var(--line);background:#151114;color:var(--ink);text-decoration:none;text-align:center}
 .sisr a span{font-family:var(--f-disp);font-weight:700;font-size:14px}.sisr a small{font-size:10px;color:var(--mute);line-height:1.3}.sisr a:active{background:rgba(163,18,27,.35)}
@@ -247,6 +248,7 @@ body.ingame #map .note{text-align:center}
     <button class="tool" id="tSnd"><small>音</small><b id="vSnd">あり</b></button>
     <button class="tool" id="tPhoto"><small>写真</small><b>撮る</b></button>
     <button class="tool" id="tQual"><small>画質</small><b id="vQual">高</b></button>
+    <button class="tool" id="tRot"><small>横画面</small><b class="vRot">自動</b></button>
     <button class="tool" id="tFog"><small>霧</small><b id="vFog">濃い</b></button>
     <button class="tool" id="tHome"><small>入口へ</small><b>戻る</b></button>
     <button class="tool" id="tStory"><small>物語</small><b>読む</b></button>
@@ -353,19 +355,32 @@ body.ingame #map .note{text-align:center}
    ============================================================ */
 const $=id=>document.getElementById(id);
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+/* 横画面固定：端末を縦に持っていても（画面の自動回転がオフでも）、画面全体を90度回して横画面で表示する。
+   端末を横にして自動回転で横画面になっているときは、ふだん通り（回さない）。 */
+let FORCE_LAND=false, ROT=false; try{ FORCE_LAND=localStorage.getItem('wax_land')==='1'; }catch(e){}
+const vW=()=>ROT?innerHeight:innerWidth, vH=()=>ROT?innerWidth:innerHeight;
+function toV(x,y){ return ROT?[y,innerWidth-x]:[x,y]; } // 画面上の座標 → 回したあとの座標
+function applyRot(){ ROT=FORCE_LAND&&innerHeight>innerWidth; const b=document.body, h=document.documentElement; h.classList.toggle('rot',ROT);
+  if(ROT){ b.style.cssText+=`;position:fixed;top:0;left:0;width:${innerHeight}px;height:${innerWidth}px;transform-origin:0 0;transform:translateX(${innerWidth}px) rotate(90deg)`; }
+  else { ['position','top','left','width','height','transform-origin','transform'].forEach(k=>b.style.removeProperty(k)); } }
+// 画面の高さ・幅で切り替えているレイアウト（横画面用など）を、回したときにも正しく効かせる
+(function(){ const pre=(sel,p)=>sel.split(',').map(x=>p+x.trim()).join(','); for(const ss of document.styleSheets){ let R; try{ R=ss.cssRules; }catch(e){ continue; } for(let i=R.length-1;i>=0;i--){ const r=R[i]; if(!r.media) continue; const m=r.media.mediaText.replace(/\s/g,'');
+    if(/max-height:520px|min-width:760px/.test(m)){ let css=''; for(const c of r.cssRules) if(c.selectorText) css+=pre(c.selectorText,'html.rot ')+'{'+c.style.cssText+'}'; try{ ss.insertRule('@media all{'+css+'}',i+1); }catch(e){} }
+    else if(/min-height:521px/.test(m)){ for(const c of r.cssRules) if(c.selectorText) try{ c.selectorText=pre(c.selectorText,'html:not(.rot) '); }catch(e){} } } } })();
+applyRot();
 if(isTouch) document.body.classList.add('touchui');
 let renderer;
 try{ renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'}); }catch(e){ $('err').hidden=false; throw e; }
 let quality='high';
 function applyPR(){ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, quality==='high'?(isTouch?1.6:1.75):1)); }
 applyPR();
-renderer.setSize(innerWidth,innerHeight);
+renderer.setSize(vW(),vH());
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.25;
 $('app').appendChild(renderer.domElement);
 const maxAniso=renderer.capabilities.getMaxAnisotropy();
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,600);
+const camera=new THREE.PerspectiveCamera(70,vW()/vH(),.05,600);
 camera.rotation.order='YXZ';
 scene.add(camera);
 const V3=(x,y,z)=>new THREE.Vector3(x,y,z);
@@ -1303,7 +1318,7 @@ $('tEra').onclick=()=>setEra(ERA==='night'?'ruin':'night');
 $('tTime').onclick=()=>{ TIME=TIME==='yoi'?'ushi':'yoi'; applyTime(); };
 $('tLamp').onclick=()=>{ LAMP=!LAMP; $('vLamp').textContent=LAMP?'灯す':'消す'; };
 $('tSnd').onclick=()=>{ SOUND=!SOUND; $('vSnd').textContent=SOUND?'あり':'なし'; SND.setOn(SOUND); };
-$('tQual').onclick=()=>{ quality=quality==='high'?'low':'high'; $('vQual').textContent=quality==='high'?'高':'軽'; applyPR(); renderer.setSize(innerWidth,innerHeight); };
+$('tQual').onclick=()=>{ quality=quality==='high'?'low':'high'; $('vQual').textContent=quality==='high'?'高':'軽'; applyPR(); renderer.setSize(vW(),vH()); };
 $('tFog').onclick=()=>{ FOGD=FOGD===1?.45:1; $('vFog').textContent=FOGD===1?'濃い':'薄い'; };
 $('tStory').onclick=()=>{ menu.hidden=true; $('story').hidden=false; }; $('storyX').onclick=()=>{ $('story').hidden=true; };
 $('tHome').onclick=()=>{ warpTo(0,0,190,0); menu.hidden=true; };
@@ -1361,21 +1376,22 @@ $('runBtn').onclick=()=>{ IN.run=!IN.run; $('runBtn').setAttribute('aria-pressed
 $('levelBtn').onclick=()=>{ P.pitch=0; };
 const sb=$('stickBase'),sk=$('stickKnob'),lb=$('lookBase'),lk=$('lookKnob');
 let stickId=null, lookId=null, dragId=null, sx0=0,sy0=0,lastX=0,lastY=0,downT=0,downX=0,downY=0,moved=false;
-function padCenter(el){ const r=el.getBoundingClientRect(); return [r.left+r.width/2,r.top+r.height/2]; }
+function padCenter(el){ const r=el.getBoundingClientRect(); return toV(r.left+r.width/2,r.top+r.height/2); }
+const EX=e=>toV(e.clientX,e.clientY)[0], EY=e=>toV(e.clientX,e.clientY)[1];
 const cv=renderer.domElement;
-cv.addEventListener('pointerdown',e=>{ if(START) return; cv.setPointerCapture(e.pointerId); downT=performance.now(); downX=e.clientX; downY=e.clientY; moved=false;
-  const padOn=!$('pad').hidden; if(padOn){ const [cx,cy]=padCenter(sb); if(Math.hypot(e.clientX-cx,e.clientY-cy)<80&&stickId==null){ stickId=e.pointerId; sx0=cx; sy0=cy; sb.classList.add('on'); return; } const [lx,ly]=padCenter(lb); if(Math.hypot(e.clientX-lx,e.clientY-ly)<80&&lookId==null){ lookId=e.pointerId; sb; lb.classList.add('on'); lastX=e.clientX; lastY=e.clientY; return; } }
-  if(dragId==null){ dragId=e.pointerId; lastX=e.clientX; lastY=e.clientY; } });
-cv.addEventListener('pointermove',e=>{ if(e.pointerId===stickId){ let dx=e.clientX-sx0,dy=e.clientY-sy0; const d=Math.hypot(dx,dy),m=48; if(d>m){ dx*=m/d; dy*=m/d; } sk.style.transform=`translate(${dx}px,${dy}px)`; IN.mx=dx/m; IN.mz=dy/m; return; }
-  if(e.pointerId===lookId){ const [lx,ly]=padCenter(lb); let dx=e.clientX-lx,dy=e.clientY-ly; const d=Math.hypot(dx,dy),m=48; if(d>m){ dx*=m/d; dy*=m/d; } lk.style.transform=`translate(${dx}px,${dy}px)`; IN.lx=dx/m; IN.ly=dy/m; return; }
-  if(e.pointerId===dragId){ const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; if(Math.hypot(e.clientX-downX,e.clientY-downY)>6) moved=true; const k=[.0026,.004,.006][sens]; P.yaw-=dx*k; P.pitch=Math.max(-1.3,Math.min(1.3,P.pitch-dy*k)); } });
+cv.addEventListener('pointerdown',e=>{ if(START) return; cv.setPointerCapture(e.pointerId); downT=performance.now(); downX=EX(e); downY=EY(e); moved=false;
+  const padOn=!$('pad').hidden; if(padOn){ const [cx,cy]=padCenter(sb); if(Math.hypot(EX(e)-cx,EY(e)-cy)<80&&stickId==null){ stickId=e.pointerId; sx0=cx; sy0=cy; sb.classList.add('on'); return; } const [lx,ly]=padCenter(lb); if(Math.hypot(EX(e)-lx,EY(e)-ly)<80&&lookId==null){ lookId=e.pointerId; sb; lb.classList.add('on'); lastX=EX(e); lastY=EY(e); return; } }
+  if(dragId==null){ dragId=e.pointerId; lastX=EX(e); lastY=EY(e); } });
+cv.addEventListener('pointermove',e=>{ if(e.pointerId===stickId){ let dx=EX(e)-sx0,dy=EY(e)-sy0; const d=Math.hypot(dx,dy),m=48; if(d>m){ dx*=m/d; dy*=m/d; } sk.style.transform=`translate(${dx}px,${dy}px)`; IN.mx=dx/m; IN.mz=dy/m; return; }
+  if(e.pointerId===lookId){ const [lx,ly]=padCenter(lb); let dx=EX(e)-lx,dy=EY(e)-ly; const d=Math.hypot(dx,dy),m=48; if(d>m){ dx*=m/d; dy*=m/d; } lk.style.transform=`translate(${dx}px,${dy}px)`; IN.lx=dx/m; IN.ly=dy/m; return; }
+  if(e.pointerId===dragId){ const dx=EX(e)-lastX, dy=EY(e)-lastY; lastX=EX(e); lastY=EY(e); if(Math.hypot(EX(e)-downX,EY(e)-downY)>6) moved=true; const k=[.0026,.004,.006][sens]; P.yaw-=dx*k; P.pitch=Math.max(-1.3,Math.min(1.3,P.pitch-dy*k)); } });
 function upPtr(e){ if(e.pointerId===stickId){ stickId=null; sk.style.transform=''; IN.mx=IN.mz=0; sb.classList.remove('on'); }
   else if(e.pointerId===lookId){ lookId=null; lk.style.transform=''; IN.lx=IN.ly=0; lb.classList.remove('on'); }
-  else if(e.pointerId===dragId){ dragId=null; if(!moved&&performance.now()-downT<350) tapAt(e.clientX,e.clientY); } }
+  else if(e.pointerId===dragId){ dragId=null; if(!moved&&performance.now()-downT<350) tapAt(EX(e),EY(e)); } }
 cv.addEventListener('pointerup',upPtr); cv.addEventListener('pointercancel',upPtr);
 addEventListener('keydown',e=>{ IN.keys[e.code]=true; if(e.code==='ShiftLeft') IN.run=true; }); addEventListener('keyup',e=>{ IN.keys[e.code]=false; if(e.code==='ShiftLeft') IN.run=$('runBtn').getAttribute('aria-pressed')==='true'; });
 const ray=new THREE.Raycaster(); const TAPMESH=[];
-function tapAt(cx,cy){ ray.setFromCamera({x:cx/innerWidth*2-1,y:-cy/innerHeight*2+1},camera); ray.far=7;
+function tapAt(cx,cy){ ray.setFromCamera({x:cx/vW()*2-1,y:-cy/vH()*2+1},camera); ray.far=7;
   const list=[]; TAPS.forEach(o=>{ if(isVis(o)) o.traverse(m=>{ if(m.isMesh||m.isSprite) list.push(m); }); });
   const hit=ray.intersectObjects(list,false)[0]; if(!hit) return; let o=hit.object; while(o&&!o.userData.tap) o=o.parent; if(!o){ o=hit.object.userData.tapRoot; } if(!o||!o.userData.tap) return;
   const t=o.userData.tap; t.i=(t.i==null?0:t.i+1)%t.lines.length; say(t.who,t.lines[t.i],5.5); if(t.fn) t.fn(); SND.blip(); }
@@ -1518,7 +1534,10 @@ function loop(now){ requestAnimationFrame(loop); const dt=Math.min(.05,(now-last
   if(wantShot){ wantShot=false; try{ $('shotImg').src=renderer.domElement.toDataURL('image/jpeg',.92); $('shot').hidden=false; }catch(e){} }
   if(!START){ miniT-=dt; if(miniT<=0){ miniT=.1; drawMini(); } if(hintT&&now>hintT){ ui.hint.hidden=true; hintT=0; } if(toastT&&now>toastT){ $('toast').style.opacity=0; toastT=0; } }
 }
-addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+function onResize(){ applyRot(); camera.aspect=vW()/vH(); camera.updateProjectionMatrix(); renderer.setSize(vW(),vH()); }
+addEventListener('resize',onResize); addEventListener('orientationchange',()=>setTimeout(onResize,250));
+function setLand(on){ FORCE_LAND=on; try{ localStorage.setItem('wax_land',on?'1':'0'); }catch(e){} document.querySelectorAll('.vRot').forEach(b=>b.textContent=on?'横に固定':'自動'); onResize(); dispatchEvent(new Event('resize')); }
+if($('tRot')) $('tRot').onclick=()=>setLand(!FORCE_LAND); document.querySelectorAll('.vRot').forEach(b=>b.textContent=FORCE_LAND?'横に固定':'自動');
 
 /* ---------- 開始 ---------- */
 $('ctlText').textContent=isTouch?'左のパッドで移動、右のパッドか画面のドラッグで見回し。人や物をタップすると反応します。':'WASD/矢印キーで移動、Shiftで走る、ドラッグで見回し。人や物をクリックすると反応します。';
@@ -2053,12 +2072,13 @@ function showTitle(){ const L=el('oniL'); L.hidden=false; const code=qs.get('roo
    ${lastRoom()?`<button class="o1" id="oniRe">前の部屋（${esc(lastRoom())}）に戻る</button>`:''}
    <div class="joinrow"><input id="oniCode" inputmode="numeric" maxlength="4" placeholder="4桁の番号" value="${esc(code)}"><button class="o2" id="oniJoin">部屋に入る</button></div>
    <p class="note">2〜8人で遊べます（同じ部屋番号を入れた人どうし）。鬼がいないときはAIの鬼が出ます。通信はP2Pのため、回線によってはつながらないことがあります（Wi‑Fi推奨）。</p>
+   <button class="o2 rotb" id="oniRot">横画面：<span class="vRot">${FORCE_LAND?'横に固定':'自動'}</span></button>
    <div class="sis"><b>姉妹ゲーム</b><div class="sisr">
     <a href="https://32miya.github.io/32miya-osaka-castle/escape/"><span>大坂城脱出</span><small>夏の陣・落城の夜</small></a>
     <a href="https://32miya.github.io/oshiro/"><span>お城さんぽ</span><small>天守をめぐる3D散策</small></a>
     <a href="https://32miya.github.io/sekai/"><span>世界さんぽ</span><small>時と海をこえて歩く</small></a></div></div>`;
   bindPicker(showTitle); const nm=()=>{ me.name=(el('oniName').value.trim()||'迷い人').slice(0,10); save(); };
-  el('oniName').onchange=nm;
+  el('oniName').onchange=nm; el('oniRot').onclick=()=>{ setLand(!FORCE_LAND); };
   el('oniSolo').onclick=()=>{ nm(); host(true); };
   el('oniHost').onclick=()=>{ nm(); host(false); };
   if(el('oniRe')) el('oniRe').onclick=()=>{ nm(); join(lastRoom()); };
@@ -2253,7 +2273,7 @@ el('tLeave').onclick=()=>{ el('menu').hidden=true; const D=el('oniDrop'); D.hidd
   el('oniLeaveN').onclick=()=>{ D.hidden=true; }; el('oniLeaveY').onclick=()=>{ leaving=true; if(net.mode==='host'&&!net.solo) broadcast({t:'bye'}); location.reload(); }; };
 /* ---------- 大きな地図（鬼ごっこ用：中央に大きく、仲間も表示） ---------- */
 { const od=drawMap; drawMap=function(){ od(); if(!GAMEMODE) return; const fr=el('mapFrame'), L=LVCAN[mapLv]; if(!L) return;
-    const r=L.W/L.H, land=innerHeight<520, aw=innerWidth-(land?300:32), ah=innerHeight-(land?44:190); let w=Math.min(aw,ah*r); fr.style.width=w+'px'; fr.style.height=(w/r)+'px'; fr.style.aspectRatio='';
+    const r=L.W/L.H, land=vH()<520, aw=vW()-(land?300:32), ah=vH()-(land?44:190); let w=Math.min(aw,ah*r); fr.style.width=w+'px'; fr.style.height=(w/r)+'px'; fr.style.aspectRatio='';
     fr.querySelectorAll('.pin').forEach(b=>{ b.onclick=null; b.style.pointerEvents='none'; });
     fr.querySelectorAll('.mpin').forEach(b=>b.remove());
     if(V) V.pl.forEach(q=>{ if(q[0]===net.myId||q[11]) return; const r0=ROSTER.find(p=>p.id===q[0]); if(!r0||r0.role!==myRole) return; if(lvlOf(q[1],q[2],q[3])!==mapLv) return;
