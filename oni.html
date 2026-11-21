@@ -1758,6 +1758,9 @@ function sees(a,b){ const dx=b.x-a.x,dz=b.z-a.z,dy=b.y-a.y, d=Math.hypot(dx,dz);
   for(let i=1;i<n;i++){ const t=i/n; if(pointBlocked(a.x+dx*t,ey+(ty-ey)*t,a.z+dz*t)) return false; }
   if(low&&outdoorFogged(b)&&d>7) return false; // 霧の中でしゃがむと遠くからは見えない
   return true; }
+// 手が届くか：高さがほぼ同じで（階段の上と下はだめ）、間に壁や手すりがないこと
+function reach(a,b,dyMax){ if(Math.abs(a.y-b.y)>dyMax) return false; const dx=b.x-a.x,dz=b.z-a.z,n=Math.max(2,Math.ceil(Math.hypot(dx,dz)/.12));
+  for(const h of [.95,1.4]){ let ok=true; for(let i=1;i<n;i++){ const t=i/n; if(pointBlocked(a.x+dx*t,a.y+h+(b.y-a.y)*t,a.z+dz*t)){ ok=false; break; } } if(ok) return true; } return false; }
 function outdoorFogged(b){ return !inR(FOOT,b.x,b.z,1)&&b.y<2; }
 
 /* ---------- 主：ゲーム進行 ---------- */
@@ -1804,9 +1807,9 @@ function hostStep(dt){ if(!G||G.over) return; const me0=G.pl.find(p=>p.id===net.
   if(G.pre<=0){
     const oni=G.pl.filter(p=>p.role==='oni'), run=G.pl.filter(p=>p.role==='run');
     G.pl.forEach(p=>{ if(p.away) p.awayT=(p.awayT||0)+dt; });
-    for(const r of run){ if(r.st!=='free'||r.hid>=0||r.away) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&Math.abs(o.y-r.y)<1.2){ catchRun(r,o); break; } } } // 隠れている者は絶対に捕まらない
+    for(const r of run){ if(r.st!=='free'||r.hid>=0||r.away) continue; for(const o of oni){ if(Math.hypot(o.x-r.x,o.z-r.z)<1.15&&reach(o,r,.6)){ catchRun(r,o); break; } } } // 隠れている者は絶対に捕まらない
     // 仲間を助ける：蝋になった仲間のそばで3秒長押し。手を離すと0から
-    for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<2.4&&Math.abs(r.y-w.y)<1.5);
+    for(const w of run){ if(w.st!=='wax') continue; const h=run.find(r=>r.st==='free'&&r.hid<0&&!r.away&&r.rs===w.id&&Math.hypot(r.x-w.x,r.z-w.z)<2.4&&reach(r,w,1.0));
       // 通信の遅れで一瞬とぎれても0に戻さない（0.4秒以上とぎれたら0から）
       if(h){ w.res+=dt; w.rgap=0; w.helper=h.id; if(w.res>=3){ w.st='free'; w.res=0; hostEvent(h.n+' が '+w.n+' の蝋を砕いて助け出した！'); } } else { const hp=run.find(r=>r.id===w.helper); if(!hp||hp.rs!==w.id){ w.res=0; w.helper=null; } else { w.rgap=(w.rgap||0)+dt; if(w.rgap>.4) w.res=0; } } } // 手を離したら即0、通信の揺れは0.4秒まで待つ
     // 見つかっているか（2＝追われている／1＝近くで探されている）
@@ -2101,7 +2104,7 @@ addEventListener('keydown',e=>{ if(e.code==='KeyC'&&GAMEMODE&&!e.repeat) setCrou
 el('runBtn').addEventListener('click',()=>{ if(CROUCH&&IN.run) setCrouch(false); });
 /* ---------- 救出（長押し3秒） ---------- */
 let rescueHold=false, rescueId=-1;
-function nearWax(){ if(!V||myRole!=='run'||HIDDEN) return null; let best=null,bd=1.8; V.pl.forEach(q=>{ if(q[0]===net.myId||!q[7]) return; const d=Math.hypot(q[1]-P.x,q[3]-P.z); if(d<bd&&Math.abs(q[2]-P.y)<1.2){ bd=d; best=q; } }); return best; }
+function nearWax(){ if(!V||myRole!=='run'||HIDDEN) return null; let best=null,bd=1.8; V.pl.forEach(q=>{ if(q[0]===net.myId||!q[7]) return; const d=Math.hypot(q[1]-P.x,q[3]-P.z); if(d<bd&&reach(P,{x:q[1],y:q[2],z:q[3]},.8)){ bd=d; best=q; } }); return best; }
 function rescueTarget(){ if(!rescueHold) return -1; const w=nearWax(); if(!w||w[0]!==rescueId){ rescueHold=false; return -1; } return rescueId; }
 { const b=el('oniRescue'); let tid=null;
   const down=e=>{ if(e.cancelable) e.preventDefault(); const w=nearWax(); if(!w) return; rescueHold=true; rescueId=w[0]; b.classList.add('on'); };
@@ -2256,7 +2259,7 @@ el('tLeave').onclick=()=>{ el('menu').hidden=true; const D=el('oniDrop'); D.hidd
   const te=el('tEra').onclick; el('tEra').onclick=()=>{ if(!GAMEMODE) te(); else say('','鬼ごっこは「あの夜」で遊びます',2); }; }
 /* ---------- 起動 ---------- */
 el('start').hidden=true; showTitle();
-window.__oni={sees,get OBSTN(){return OBST.n;},get G(){return G;},get ROSTER(){return ROSTER;},get V(){return V;},net,NAV:()=>NAV,buildNav,host,hostStart,me};
+window.__oni={sees,reach,surfaceAt:(x,z,y)=>surfaceAt(x,z,y),get OBSTN(){return OBST.n;},get G(){return G;},get ROSTER(){return ROSTER;},get V(){return V;},net,NAV:()=>NAV,buildNav,host,hostStart,me};
 return {};
 })();
 
