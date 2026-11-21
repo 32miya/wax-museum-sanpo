@@ -357,10 +357,10 @@ const $=id=>document.getElementById(id);
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 /* 横画面固定：端末を縦に持っていても（画面の自動回転がオフでも）、画面全体を90度回して横画面で表示する。
    端末を横にして自動回転で横画面になっているときは、ふだん通り（回さない）。 */
-let FORCE_LAND=false, ROT=false; try{ FORCE_LAND=localStorage.getItem('wax_land')==='1'; }catch(e){}
+let FORCE_LAND=false, ROT=false, ROTOK=()=>true; // ROTOK：今の画面を横に回してよいか（スタート画面などは縦のまま） try{ FORCE_LAND=localStorage.getItem('wax_land')==='1'; }catch(e){}
 const vW=()=>ROT?innerHeight:innerWidth, vH=()=>ROT?innerWidth:innerHeight;
 function toV(x,y){ return ROT?[y,innerWidth-x]:[x,y]; } // 画面上の座標 → 回したあとの座標
-function applyRot(){ ROT=FORCE_LAND&&innerHeight>innerWidth; const b=document.body, h=document.documentElement; h.classList.toggle('rot',ROT);
+function applyRot(){ ROT=FORCE_LAND&&innerHeight>innerWidth&&ROTOK(); const b=document.body, h=document.documentElement; h.classList.toggle('rot',ROT);
   if(ROT){ b.style.cssText+=`;position:fixed;top:0;left:0;width:${innerHeight}px;height:${innerWidth}px;transform-origin:0 0;transform:translateX(${innerWidth}px) rotate(90deg)`; }
   else { ['position','top','left','width','height','transform-origin','transform'].forEach(k=>b.style.removeProperty(k)); } }
 // 画面の高さ・幅で切り替えているレイアウト（横画面用など）を、回したときにも正しく効かせる
@@ -1461,7 +1461,8 @@ $('shotX').onclick=()=>{ $('shot').hidden=true; };
    メインループ
    ============================================================ */
 let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null, GAMEMINI=null;
-let START=true, last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
+let START=true; ROTOK=()=>!START; // スタート画面は縦のまま、歩きはじめたら横に
+let last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
 const tmpV=new THREE.Vector3(), fwd=new THREE.Vector3();
 function step(dt,t){
   // 入力
@@ -1546,7 +1547,7 @@ setEra('night'); applyTime(); updFuda(); setPad(isTouch?1:0);
 scene.fog.density=.022; scene.fog.color.set('#1c222e'); hemi.intensity=.75; moonL.intensity=.7;
 requestAnimationFrame(loop);
 $('goBtn').disabled=false; $('goBtn').textContent='森へ入る';
-$('goBtn').onclick=()=>{ START=false; $('start').hidden=true; SND.init(); SND.setOn(SOUND); P.yaw=0; say('','霧の向こうに、ランタンの灯りがひとつ……荷車を引く老人の後を追って、館へ続く小道をたどってみよう。',6); };
+$('goBtn').onclick=()=>{ START=false; $('start').hidden=true; dispatchEvent(new Event('resize')); SND.init(); SND.setOn(SOUND); P.yaw=0; say('','霧の向こうに、ランタンの灯りがひとつ……荷車を引く老人の後を追って、館へ続く小道をたどってみよう。',6); };
 window.__dbg={P,warpTo,setEra,SPOTS,scene,camera,renderer,step:(n)=>{ for(let i=0;i<n;i++) step(1/30,i/30); }};
 
 const CH=(function(){
@@ -1743,6 +1744,7 @@ let lobby=[]; let SET={min:10,ai:'auto'};
 let G=null;   // 主だけが持つ正本
 let V=null;   // 画面に出す最新の状態（主は G から作る）
 let myIdx=-1, inGame=false, ended=false;
+ROTOK=()=>!START&&!ended; // スタート画面・控え室・結果画面は縦のまま。プレイ中だけ横に
 const AV=new Map(); // id -> {av, tag, tx,ty,tz,tyaw, mv, st, hid, wax}
 
 /* ---------- アバター ---------- */
@@ -2055,7 +2057,7 @@ function onMsg(m){ if(m.t==='ping') return; if(m.t==='you'){ net.myId=m.id; }
   else if(m.t==='ev'){ onEv(m.m); }
   else if(m.t==='caught'){ forceUnhide(); }
   else if(m.t==='end'){ onEnd(m); }
-  else if(m.t==='back'){ ended=false; inGame=false; el('oniEnd').hidden=true; teardown(); GAMEMODE=false; START=true; showLobby(); }
+  else if(m.t==='back'){ ended=false; inGame=false; el('oniEnd').hidden=true; teardown(); GAMEMODE=false; START=true; showLobby(); dispatchEvent(new Event('resize')); }
   else if(m.t==='bye'){ leaving=true; dropUI(0); try{ localStorage.removeItem('oni_last'); }catch(e){} lobbyMsg('主が部屋を閉じました'); } }
 function snap(){ return {t:'snap',tl:G.t,pre:G.pre,pl:G.pl.map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),p.mv,p.hid,p.st==='wax'?1:0,+(p.res||0).toFixed(1),p.away?1:0,p.key>=0?1:0,p.st==='esc'?1:0,p.cr?1:0,p.al||0]),k:G.keys.map(k=>[k.x,k.y,k.z,k.by])}; }
 
@@ -2072,7 +2074,7 @@ function showTitle(){ const L=el('oniL'); L.hidden=false; const code=qs.get('roo
    ${lastRoom()?`<button class="o1" id="oniRe">前の部屋（${esc(lastRoom())}）に戻る</button>`:''}
    <div class="joinrow"><input id="oniCode" inputmode="numeric" maxlength="4" placeholder="4桁の番号" value="${esc(code)}"><button class="o2" id="oniJoin">部屋に入る</button></div>
    <p class="note">2〜8人で遊べます（同じ部屋番号を入れた人どうし）。鬼がいないときはAIの鬼が出ます。通信はP2Pのため、回線によってはつながらないことがあります（Wi‑Fi推奨）。</p>
-   <button class="o2 rotb" id="oniRot">横画面：<span class="vRot">${FORCE_LAND?'横に固定':'自動'}</span></button>
+   <button class="o2 rotb" id="oniRot">プレイ中の横画面：<span class="vRot">${FORCE_LAND?'横に固定':'自動'}</span></button>
    <div class="sis"><b>姉妹ゲーム</b><div class="sisr">
     <a href="https://32miya.github.io/32miya-osaka-castle/escape/"><span>大坂城脱出</span><small>夏の陣・落城の夜</small></a>
     <a href="https://32miya.github.io/oshiro/"><span>お城さんぽ</span><small>天守をめぐる3D散策</small></a>
@@ -2105,7 +2107,7 @@ function hostStart(){ newGame(); const pl=G.pl.map(p=>({id:p.id,n:p.n,role:p.rol
 let myRole='run', ROSTER=[], myMoving=false, wasWax=false, evT=0;
 function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').hidden=true; el('oniEnd').hidden=true; el('oniHud').hidden=false; el('oniGoal').hidden=false; prevStop();
   const mine=pl.find(p=>p.id===net.myId); myRole=mine?mine.role:'run';
-  GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
+  GAMEMODE=true; BOUNDS=GB; START=false; el('start').hidden=true; dispatchEvent(new Event('resize')); setEra('night'); OLD.g.visible=false; OLD.speed=0; OLD.light.intensity=0; OLD.wait=1e9;
   SND.init(); SND.setOn(SOUND); warpTo(mine.x,mine.y,mine.z,mine.yaw); P.pitch=0; wasWax=false;
   teardown(); pl.forEach(p=>{ if(p.id!==net.myId||true) avFor(p); });
   if(!isTouch) setPad(0); else setPad(1); EXITG.visible=true; OBST.g.visible=true; { const nt=el('map').querySelector('.note'); if(nt) nt.textContent='◆は「銀の鍵」と「森の出口」。青い丸は仲間です。鬼ごっこの間は地図から移動できません。'; } window._escShown=0; el('fudaN').hidden=true; document.body.classList.add('ingame'); el('spotsBtn').hidden=true; el('poi').hidden=true; stamina=6; rescueHold=false; KEYV.forEach(m=>{ scene.remove(m); }); KEYV.length=0;
@@ -2113,7 +2115,7 @@ function startWorld(pl,resume){ ROSTER=pl; inGame=true; ended=false; el('oniL').
   say(myRole==='oni'?'あなたは鬼':'あなたは逃げる側',myRole==='oni'?'10秒後に動けるようになります。迷い人を全員捕まえれば勝ち。銀の鍵を持った者を森の出口へ行かせるな。':'森の入口から館へ。館のどこかにある銀の鍵を拾い、北の森の出口まで逃げれば勝ち。隠れている間は絶対に捕まらない。捕まった仲間はそばで3秒長押しすると助けられる。',9); }
 function teardown(){ AV.forEach(A=>scene.remove(A.av.g)); AV.clear(); }
 function onEv(m){ say('',m,4.5); }
-function onEnd(r){ ended=true; inGame=false; if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; { const RED=el('oniRed'); RED.className=''; RED._al=-1; el('oniAlert').textContent=''; el('oniAlert').className=''; } el('oniCrouch').hidden=true; el('oniRescue').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniGoal').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
+function onEnd(r){ ended=true; inGame=false; setTimeout(()=>dispatchEvent(new Event('resize')),0); if(HIDDEN) hideOut(); GAMEMODE=false; LOCKBY=false; SPEC.on=false; el('oniSpec').hidden=true; { const RED=el('oniRed'); RED.className=''; RED._al=-1; el('oniAlert').textContent=''; el('oniAlert').className=''; } el('oniCrouch').hidden=true; el('oniRescue').hidden=true; const E=el('oniEnd'); E.hidden=false; el('oniHud').hidden=true; el('oniGoal').hidden=true; el('oniWax').hidden=true; el('oniRed').style.opacity=0; $('hideBtn').hidden=true;
   const iWin=(r.win==='oni')===(myRole==='oni'); const surv=r.pl.filter(p=>p.role==='run'&&p.st==='esc').map(p=>p.n);
   E.innerHTML=`<div class="box"><div class="k">${r.win==='oni'?'鬼の勝ち':'脱出成功'}</div><h2>${iWin?'勝利':'敗北'}</h2><p>${r.win==='oni'?'森の出口にたどり着いた者はいなかった。迷い人たちは蝋人形にされ、回廊に新しい作品が並んだ……':'銀の鍵を手に、'+esc(surv.join('、'))+' は森の出口から霧ノ森を逃げのびた。'}</p>
    <ul class="plist">${r.pl.map(p=>`<li><span class="${p.role==='oni'?'oni':'run'}">${p.role==='oni'?'鬼':'逃'}</span>${esc(p.n)}${p.ai?'<small>AI</small>':''}<small>${p.role==='run'?(p.st==='esc'?'脱出':p.st==='wax'?'蝋人形':'森の中'):''}</small></li>`).join('')}</ul>

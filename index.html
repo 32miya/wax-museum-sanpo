@@ -258,10 +258,10 @@ const $=id=>document.getElementById(id);
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 /* 横画面固定：端末を縦に持っていても（画面の自動回転がオフでも）、画面全体を90度回して横画面で表示する。
    端末を横にして自動回転で横画面になっているときは、ふだん通り（回さない）。 */
-let FORCE_LAND=false, ROT=false; try{ FORCE_LAND=localStorage.getItem('wax_land')==='1'; }catch(e){}
+let FORCE_LAND=false, ROT=false, ROTOK=()=>true; // ROTOK：今の画面を横に回してよいか（スタート画面などは縦のまま） try{ FORCE_LAND=localStorage.getItem('wax_land')==='1'; }catch(e){}
 const vW=()=>ROT?innerHeight:innerWidth, vH=()=>ROT?innerWidth:innerHeight;
 function toV(x,y){ return ROT?[y,innerWidth-x]:[x,y]; } // 画面上の座標 → 回したあとの座標
-function applyRot(){ ROT=FORCE_LAND&&innerHeight>innerWidth; const b=document.body, h=document.documentElement; h.classList.toggle('rot',ROT);
+function applyRot(){ ROT=FORCE_LAND&&innerHeight>innerWidth&&ROTOK(); const b=document.body, h=document.documentElement; h.classList.toggle('rot',ROT);
   if(ROT){ b.style.cssText+=`;position:fixed;top:0;left:0;width:${innerHeight}px;height:${innerWidth}px;transform-origin:0 0;transform:translateX(${innerWidth}px) rotate(90deg)`; }
   else { ['position','top','left','width','height','transform-origin','transform'].forEach(k=>b.style.removeProperty(k)); } }
 // 画面の高さ・幅で切り替えているレイアウト（横画面用など）を、回したときにも正しく効かせる
@@ -1362,7 +1362,8 @@ $('shotX').onclick=()=>{ $('shot').hidden=true; };
    メインループ
    ============================================================ */
 let GAMEMODE=false, GAMECAM=null, GAMESTEP=null, LOCKMOVE=null, RUNSPD=()=>4.6, WALKSPD=()=>2.1, BOUNDS=null, GAMEMINI=null;
-let START=true, last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
+let START=true; ROTOK=()=>!START; // スタート画面は縦のまま、歩きはじめたら横に
+let last=performance.now(), T0=performance.now(), stepAcc=0, screamT=12, tickT=0, owlT=30, poolT=0, silT=0, scareDone=false;
 const tmpV=new THREE.Vector3(), fwd=new THREE.Vector3();
 function step(dt,t){
   // 入力
@@ -1447,7 +1448,7 @@ setEra('night'); applyTime(); updFuda(); setPad(isTouch?1:0);
 scene.fog.density=.022; scene.fog.color.set('#1c222e'); hemi.intensity=.75; moonL.intensity=.7;
 requestAnimationFrame(loop);
 $('goBtn').disabled=false; $('goBtn').textContent='森へ入る';
-$('goBtn').onclick=()=>{ START=false; $('start').hidden=true; SND.init(); SND.setOn(SOUND); P.yaw=0; say('','霧の向こうに、ランタンの灯りがひとつ……荷車を引く老人の後を追って、館へ続く小道をたどってみよう。',6); };
+$('goBtn').onclick=()=>{ START=false; $('start').hidden=true; dispatchEvent(new Event('resize')); SND.init(); SND.setOn(SOUND); P.yaw=0; say('','霧の向こうに、ランタンの灯りがひとつ……荷車を引く老人の後を追って、館へ続く小道をたどってみよう。',6); };
 window.__dbg={P,warpTo,setEra,SPOTS,scene,camera,renderer,step:(n)=>{ for(let i=0;i<n;i++) step(1/30,i/30); }};
 </script>
 </body>
